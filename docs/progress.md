@@ -8,18 +8,20 @@ task's commit. Never report progress that has not been verified.
 ## Current state
 
 **Status:** READY FOR REVIEW
-**Current Task:** TASK 00B — Architecture decision lock-in
-**Completed Tasks:** TASK 00 (planning baseline)
-**Next Task:** TASK 01 — Expo + TypeScript scaffold
-**Known Issues:** none
+**Current Task:** TASK 01 — Expo + TypeScript scaffold
+**Completed Tasks:** TASK 00 (planning baseline), TASK 00B (architecture lock-in)
+**Next Task:** TASK 02 — Strict TypeScript, lint, format, aliases
+**Known Issues:** one naming discrepancy to reconcile in TASK 03 — see Task 01 entry.
 
-**Repository state:** planning documents only — `CLAUDE.md`, `PLAN.md`,
-`docs/project-brief.md`, `docs/progress.md`. No application code, no dependencies
-installed, no Expo app, no Firebase project wired. Git repository on `main` with **no
-commits**; remote `origin` is configured but **nothing has been pushed**, and nothing may
-be pushed without explicit user approval.
+**Repository state:** planning documents plus an Expo SDK 57 + TypeScript scaffold.
+Dependencies installed: `expo`, `expo-status-bar`, `react`, `react-native`,
+`react-native-safe-area-context`, `typescript`, `@types/react` — nothing else.
+No Firebase, navigation, state, query, notification, QR or business code exists.
+Git repository on `main`; planning docs committed as `bf07557`; the TASK 01 scaffold is
+**uncommitted and unpushed**, awaiting user review. Nothing may be pushed without
+explicit user approval.
 
-**Blocked on:** nothing. All open questions from TASK 00 are resolved. TASK 01 may start.
+**Blocked on:** nothing.
 
 ---
 
@@ -83,6 +85,41 @@ Commit: not committed — user directed no commit.
 Known issues: none blocking. Six accepted limitations recorded in
 `docs/project-brief.md` §Accepted limitations.
 Next task: TASK 01
+
+## Task 01
+
+Status: READY FOR REVIEW — verification passed, awaiting user commit.
+Implemented: Expo SDK 57 + React Native 0.86 + React 19 + TypeScript 6 scaffold at the
+repository root (no nested project directory), from the `blank-typescript` template —
+**not** the default `create-expo-app` template, which ships `expo-router` and would
+conflict with the React Navigation decision in TASK 16.
+Files: `package.json` (named `vku-study-room-booking`, `typecheck` script added),
+`app.json` (name/slug set to the project), `tsconfig.json` (`strict: true` via
+`expo/tsconfig.base`), `index.ts`, `App.tsx` (placeholder root screen, presentational
+only), `.gitignore` (extended for `.env`, `.env.*` with a `!.env.example` negation,
+`coverage/`, `*.log`, and Firebase service-account/credential patterns per CLAUDE.md §8),
+`.env.example` (no values yet), `README.md`, `assets/`, and an empty `src/` skeleton
+(`components`, `screens`, `navigation`, `store`, `services`, `hooks`, `types`, `data`,
+`utils`, `providers`) held by `.gitkeep`.
+The template's own `CLAUDE.md`, `AGENTS.md`, `.claude/settings.json` and Expo `LICENSE`
+were deliberately not copied; the project planning documents were never modified.
+Verification: `npm install` → 467 packages, no install errors. `npm run typecheck`
+(`tsc --noEmit`) → exit 0, zero errors. `npx expo start` → Metro reported
+`packager-status:running`; Android and iOS bundles both returned HTTP 200
+(`Android Bundled 22618ms index.ts (738 modules)`, `iOS Bundled 14096ms index.ts
+(737 modules)`) with no errors, and the placeholder screen's title string is present in
+the compiled bundle. `git check-ignore` / `git add -n` confirm `.env` is refused and
+`.env.example` is trackable. Greps confirm no `any`, no `@ts-ignore`, no nested
+`package.json`, and none of the ten deferred packages installed.
+Not verified: on-device rendering in Expo Go — no physical device or emulator was
+available in this environment. Bundling for both platforms is the closest proxy that was
+actually run; the user should confirm on a device.
+Commit: not committed — user directed no commit; they will review and commit.
+Known issues: the `src/` folder list specified for TASK 01 (`store`, `types`, `data`,
+`utils`, `providers`, `screens`) differs from the layer list in CLAUDE.md §3 and PLAN.md
+TASK 03 (`app`, `features`, `domain`, `lib`, `theme`). Both were left as-is rather than
+silently reconciled; TASK 03 owns the final architecture and must resolve the naming.
+Next task: TASK 02
 
 ---
 
