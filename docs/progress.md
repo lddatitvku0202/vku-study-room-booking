@@ -85,6 +85,63 @@ Known issues:
 Commit: `feat(mvp): build optimized 120-room discovery`
 Next: MVP-02
 
+## MVP-02
+
+Status: READY FOR REVIEW
+Implemented:
+- **Debounced search** — `src/hooks/useDebounce.ts` (generic; each change restarts the
+  timer, cleared in the effect cleanup). Flow: `TextInput → searchText → useDebounce(300 ms)
+  → useMemo(filterRooms) → FlatList`. Search matches room name, case-insensitive, trimmed.
+  A "Searching…" summary shows while the debounce is pending.
+- **Pure filtering** — `src/utils/room-filters.ts`: `filterRooms`, `hasActiveFilters`,
+  `EMPTY_FILTERS`, on the existing `RoomFilters` type. **AND logic across everything**:
+  name AND building AND capacity ≥ minimum AND **all** selected equipment. With no active
+  criteria it returns the same array reference, so FlatList data stays stable.
+- **`filteredRooms` uses `useMemo`** with exact dependencies
+  `[allRooms, debouncedSearch, building, minimumCapacity, equipment]`. No filtering in JSX or
+  `renderItem`.
+- **Filter UI** — `src/components/FilterChip.tsx` (reusable, `React.memo`, 36pt chip with
+  hitSlop to reach the 44pt target, `accessibilityState.selected`) and
+  `src/components/FilterChipGroup.tsx` (generic over the option type, one labelled
+  horizontal `FlatList` per group — no casts). Groups: Building A/B/C/V (single-select,
+  tap again to deselect), Capacity 4+/6+/10+/15+/20+ (single-select minimum), Equipment
+  (multi-select). "Clear filters" resets search and all filters; it also appears in the
+  no-results empty state.
+- **Status presentation** — the card badge now reads **"Available Now" / "Occupied"**, and
+  the screen states "Demo data · status is a preview, not live occupancy". Status still
+  comes from the deterministic `getMockRoomStatus` util (MVP-01), computed once per dataset.
+- **RoomCard layout** — the status badge moved to its own line next to the seat count so
+  it no longer truncates the room name (the code users search for). Fixed height raised
+  128 → 136pt (row 152pt); `getItemLayout` still reads the same constant. `React.memo` kept.
+- Filter criteria are local screen state for now; the Zustand store arrives in MVP-04.
+Verification:
+  npm run typecheck    → PASS (exit 0)
+  npm run lint         → PASS (exit 0, after an auto-fixed import-order nit)
+  npm run format:check → PASS (exit 0)
+  Filter logic (real `filterRooms` on the real 120-room dataset) → 13/13 PASS:
+    1. search "B2"                     → 6 rooms (B201–B206); "b2" and "  B2 " identical
+    2. Building B                      → 30 rooms
+    3. Capacity ≥ 10                   → 60 rooms
+    4. Projector                       → 60 rooms
+    5. B AND ≥10 AND Projector         → 11 rooms; + search "B2" → 3 (B201, B203, B206)
+       Projector AND AC                → 45 rooms (fewer than Projector alone — AND, not OR)
+    6. Clear filters                   → 120 rooms, same array reference
+       no match ("zzz")                → empty list → empty state
+  Structure → debounce constant 300; FlatList props intact (`getItemLayout`, `keyExtractor`,
+    10 / 10 / 7, `removeClippedSubviews`); RoomCard still `React.memo`; no ScrollView; no `any`
+  Metro bundle → PASS — android and ios HTTP 200 (817 modules)
+Known issues:
+- **Debounce timing and scroll smoothness not verified on a device** — no device or
+  simulator here, and no React test renderer is installed (a test framework is TASK 43).
+  The hook is the standard clear-and-restart pattern; on device, typing fast should show
+  "Searching…" and update the list once, about 300 ms after the last keystroke.
+- Equipment uses "must have all selected". PLAN.md TASK 22 (production) describes OR within
+  a dimension; the MVP follows this task's "search + all filters: AND logic".
+- The fixed header (title, search, three chip rows, summary) takes about 300pt, so small
+  phones show roughly two cards at a time.
+Commit: `feat(mvp): add debounced search and room filters`
+Next: MVP-03
+
 ---
 
 ## Current state

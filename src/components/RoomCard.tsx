@@ -12,13 +12,18 @@ import type { Room, RoomStatus } from '@/types/room';
  * Fixed card height. Every line of text is clamped to one line so the card can
  * never grow — `getItemLayout` in the room list relies on this being exact.
  */
-export const ROOM_CARD_HEIGHT = 128;
+export const ROOM_CARD_HEIGHT = 136;
 /** Gap below each card. */
 export const ROOM_CARD_GAP = spacing.md;
 /** Total vertical space one row occupies in the list (card + gap). */
 export const ROOM_ROW_HEIGHT = ROOM_CARD_HEIGHT + ROOM_CARD_GAP;
 
 const IMAGE_SIZE = ROOM_CARD_HEIGHT - spacing.md * 2;
+
+/** Display label for a demo status. Not physical occupancy. */
+export function getRoomStatusLabel(status: RoomStatus): string {
+  return status === 'available' ? 'Available Now' : 'Occupied';
+}
 
 export interface RoomCardProps {
   readonly room: Room;
@@ -30,11 +35,11 @@ export interface RoomCardProps {
  *
  * Wrapped in `React.memo`: props are a stable `room` reference from the query
  * cache plus a primitive status string, so a row re-renders only when its own
- * data changes — not when the list scrolls or a sibling updates.
+ * data changes — not when the list scrolls, filters change, or a sibling updates.
  */
 export const RoomCard = memo(function RoomCard({ room, status }: RoomCardProps) {
   const isAvailable = status === 'available';
-  const statusLabel = isAvailable ? 'Available' : 'Occupied';
+  const statusLabel = getRoomStatusLabel(status);
 
   return (
     <View style={styles.row}>
@@ -45,18 +50,21 @@ export const RoomCard = memo(function RoomCard({ room, status }: RoomCardProps) 
       >
         <Image source={{ uri: room.image }} style={styles.image} accessibilityIgnoresInvertColors />
         <View style={styles.body}>
-          <View style={styles.titleRow}>
-            <AppText variant="heading" numberOfLines={1} style={styles.name}>
-              {room.name}
-            </AppText>
-            <Badge label={statusLabel} tone={isAvailable ? 'success' : 'error'} />
-          </View>
+          <AppText variant="heading" numberOfLines={1}>
+            {room.name}
+          </AppText>
           <AppText variant="caption" color="textSecondary" numberOfLines={1}>
-            Building {room.building} · Floor {room.floor} · {room.capacity} seats
+            Building {room.building} · Floor {room.floor}
           </AppText>
           <AppText variant="caption" color="textSecondary" numberOfLines={1}>
             {room.equipment.join(' · ')}
           </AppText>
+          <View style={styles.statusRow}>
+            <Badge label={statusLabel} tone={isAvailable ? 'success' : 'error'} />
+            <AppText variant="caption" color="text" numberOfLines={1} style={styles.capacity}>
+              {room.capacity} seats
+            </AppText>
+          </View>
         </View>
       </Card>
     </View>
@@ -84,12 +92,12 @@ const styles = StyleSheet.create({
     marginLeft: spacing.md,
     gap: spacing.xs,
   },
-  titleRow: {
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  name: {
-    flexShrink: 1,
+  capacity: {
+    fontWeight: '600',
   },
 });
