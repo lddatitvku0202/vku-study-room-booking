@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, View, type ListRenderItem } from 'react-native';
 
 import { FilterChipGroup } from '@/components/FilterChipGroup';
@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { spacing } from '@/data/theme';
 import { useRooms } from '@/hooks/use-rooms';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useBookingStore } from '@/store/useBookingStore';
 import { getMockRoomStatus } from '@/utils/mock-room-status';
 import { filterRooms, hasActiveFilters } from '@/utils/room-filters';
 
@@ -53,24 +54,28 @@ function equipmentLabel(item: Equipment): string {
   return item;
 }
 
-function toggleInList<T>(list: readonly T[], item: T): readonly T[] {
-  return list.includes(item) ? list.filter((entry) => entry !== item) : [...list, item];
-}
-
 /**
  * Browse all rooms, with debounced search and AND-combined filters.
  *
  * Flow: TextInput → searchText → useDebounce(300 ms) → useMemo(filterRooms) → FlatList.
  * Rooms come from `useRooms()` (TanStack Query over the room repository) and are
- * never copied into state; only the filter criteria are local UI state.
+ * never copied into client state. The filter criteria are client state in the
+ * Zustand store, read through narrow selectors.
  */
 export function BrowseRoomsScreen({ navigation }: MainTabScreenProps<'BrowseRooms'>): JSX.Element {
   const { data: rooms, isPending, isError, refetch } = useRooms();
 
-  const [searchText, setSearchText] = useState('');
-  const [building, setBuilding] = useState<Building | undefined>(undefined);
-  const [minimumCapacity, setMinimumCapacity] = useState<number | undefined>(undefined);
-  const [equipment, setEquipment] = useState<readonly Equipment[]>([]);
+  // One selector per field: each returns a primitive or a stable array reference,
+  // so the screen re-renders only when a criterion it uses actually changes.
+  const searchText = useBookingStore((state) => state.filters.search);
+  const building = useBookingStore((state) => state.filters.building);
+  const minimumCapacity = useBookingStore((state) => state.filters.minimumCapacity);
+  const equipment = useBookingStore((state) => state.filters.equipment);
+  const setSearch = useBookingStore((state) => state.setSearch);
+  const toggleBuilding = useBookingStore((state) => state.toggleBuilding);
+  const toggleCapacity = useBookingStore((state) => state.toggleMinimumCapacity);
+  const toggleEquipment = useBookingStore((state) => state.toggleEquipment);
+  const clearFilters = useBookingStore((state) => state.clearFilters);
 
   const debouncedSearch = useDebounce(searchText, SEARCH_DEBOUNCE_MS);
   const isSearchPending = searchText !== debouncedSearch;
@@ -122,32 +127,16 @@ export function BrowseRoomsScreen({ navigation }: MainTabScreenProps<'BrowseRoom
   );
 
   const isBuildingSelected = useCallback((option: Building) => option === building, [building]);
-  const toggleBuilding = useCallback((option: Building) => {
-    setBuilding((current) => (current === option ? undefined : option));
-  }, []);
 
   const isCapacitySelected = useCallback(
     (option: number) => option === minimumCapacity,
     [minimumCapacity],
   );
-  const toggleCapacity = useCallback((option: number) => {
-    setMinimumCapacity((current) => (current === option ? undefined : option));
-  }, []);
 
   const isEquipmentSelected = useCallback(
     (option: Equipment) => equipment.includes(option),
     [equipment],
   );
-  const toggleEquipment = useCallback((option: Equipment) => {
-    setEquipment((current) => toggleInList(current, option));
-  }, []);
-
-  const clearFilters = useCallback(() => {
-    setSearchText('');
-    setBuilding(undefined);
-    setMinimumCapacity(undefined);
-    setEquipment([]);
-  }, []);
 
   const handleRetry = useCallback(() => {
     void refetch();
@@ -167,7 +156,7 @@ export function BrowseRoomsScreen({ navigation }: MainTabScreenProps<'BrowseRoom
 
         <AppInput
           value={searchText}
-          onChangeText={setSearchText}
+          onChangeText={setSearch}
           placeholder="Search room name (e.g. B2)"
           accessibilityLabel="Search rooms by name"
           autoCorrect={false}

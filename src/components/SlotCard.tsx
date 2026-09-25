@@ -4,20 +4,35 @@ import { Pressable, StyleSheet } from 'react-native';
 import { AppText } from '@/components/ui/AppText';
 import { colors, radius, sizes, spacing } from '@/data/theme';
 
+import type { ColorToken } from '@/data/theme';
 import type { SlotId } from '@/data/time-slots';
 
 /**
- * - `available` — can be picked
- * - `selected`  — the user's current pick
- * - `past`      — the slot has already started today; never selectable
+ * - `available`  — can be picked
+ * - `selected`   — the user's current pick
+ * - `past`       — the slot has already started today
+ * - `booked`     — a confirmed booking on this device already holds it
+ * - `conflicted` — the demo simulator reported a conflict for it this session
  */
-export type SlotCardState = 'available' | 'selected' | 'past';
+export type SlotCardState = 'available' | 'selected' | 'past' | 'booked' | 'conflicted';
 
 const STATE_CAPTION: Readonly<Record<SlotCardState, string>> = {
   available: 'Available',
   selected: 'Selected',
   past: 'Past',
+  booked: 'Booked',
+  conflicted: 'Unavailable',
 };
+
+const CAPTION_COLOR: Readonly<Record<SlotCardState, ColorToken>> = {
+  available: 'success',
+  selected: 'surface',
+  past: 'disabled',
+  booked: 'primary',
+  conflicted: 'error',
+};
+
+const DISABLED_STATES: ReadonlySet<SlotCardState> = new Set(['past', 'booked', 'conflicted']);
 
 export interface SlotCardProps {
   readonly slotId: SlotId;
@@ -29,7 +44,7 @@ export interface SlotCardProps {
 /** One of the four fixed time slots. Users can only pick, never type, a time. */
 export const SlotCard = memo(function SlotCard({ slotId, label, state, onSelect }: SlotCardProps) {
   const isSelected = state === 'selected';
-  const isDisabled = state === 'past';
+  const isDisabled = DISABLED_STATES.has(state);
   const handlePress = useCallback(() => {
     onSelect(slotId);
   }, [onSelect, slotId]);
@@ -55,11 +70,7 @@ export const SlotCard = memo(function SlotCard({ slotId, label, state, onSelect 
       >
         {label}
       </AppText>
-      <AppText
-        variant="caption"
-        color={isSelected ? 'surface' : isDisabled ? 'disabled' : 'success'}
-        style={styles.caption}
-      >
+      <AppText variant="caption" color={CAPTION_COLOR[state]} style={styles.caption}>
         {STATE_CAPTION[state]}
       </AppText>
     </Pressable>

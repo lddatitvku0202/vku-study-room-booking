@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { colors, radius, sizes, spacing } from '@/data/theme';
@@ -10,6 +10,8 @@ export interface AppButtonProps {
   readonly onPress: () => void;
   readonly variant?: 'primary' | 'secondary';
   readonly disabled?: boolean;
+  /** Shows a spinner and blocks presses — use while an action is in flight. */
+  readonly loading?: boolean;
 }
 
 /** Tappable action with a guaranteed 44pt touch target. */
@@ -18,24 +20,32 @@ export function AppButton({
   onPress,
   variant = 'primary',
   disabled = false,
+  loading = false,
 }: AppButtonProps): JSX.Element {
   const isPrimary = variant === 'primary';
+  const isInert = disabled || loading;
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isInert, busy: loading }}
+      disabled={isInert}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
         isPrimary ? styles.primary : styles.secondary,
-        pressed && (isPrimary ? styles.primaryPressed : styles.secondaryPressed),
-        disabled && styles.disabled,
+        (pressed || loading) && (isPrimary ? styles.primaryPressed : styles.secondaryPressed),
+        disabled && !loading && styles.disabled,
       ]}
     >
-      <AppText color={isPrimary ? 'surface' : 'primary'} style={styles.label}>
-        {label}
-      </AppText>
+      {loading ? (
+        <ActivityIndicator color={isPrimary ? colors.surface : colors.primary} />
+      ) : (
+        <AppText color={isPrimary ? 'surface' : 'primary'} style={styles.label}>
+          {label}
+        </AppText>
+      )}
     </Pressable>
   );
 }

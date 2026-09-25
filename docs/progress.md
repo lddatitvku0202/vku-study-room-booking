@@ -205,6 +205,93 @@ Known issues:
 Commit: `feat(mvp): add typed navigation and room details`
 Next: MVP-04
 
+## MVP-04
+
+Status: READY FOR REVIEW
+
+> **The conflict engine is a LOCAL DEMO SIMULATION.** ~30% of booking attempts fail at
+> random via `Math.random()`. There is **no Firebase, no realtime listener and no
+> multi-user conflict** in the MVP — no other user exists. Bookings are stored on the
+> device only and are not synchronized between devices or users.
+
+Implemented:
+- **Dependencies** — `zustand@^5.0.15`, `@react-native-async-storage/async-storage@2.2.0`
+  (via `npx expo install`; `expo install --check` → up to date).
+- **`buildSlotKey()`** — `src/utils/slot-key.ts`, the single definition:
+  `roomId_date_slotId`, e.g. `room-B205_2026-09-28_07:30-09:30`. The task text renders the
+  separator as `*`, but its own example and CLAUDE.md use `_`, so `_` is used.
+- **Store** — `src/store/useBookingStore.ts` (Zustand): `bookings`, `filters`,
+  `conflictedSlotKeys`; actions `addBooking`, `cancelBooking`, `markSlotConflict`,
+  `clearConflict`, plus filter actions. Every component reads through a narrow selector
+  (no whole-store subscription anywhere). Browse Rooms now takes its filters from the store.
+- **Persistence** — Zustand `persist` + `createJSONStorage(() => AsyncStorage)`, version 1,
+  `partialize` saves **only `bookings`** (filters and conflict marks reset on restart, so a
+  random demo conflict never blocks a slot permanently). `merge` re-validates every saved
+  entry with `isBooking()` and drops malformed ones.
+- **Local duplicate prevention** — before sending, a confirmed booking on the same slot key
+  is rejected; `addBooking` re-checks atomically and refuses a taken slot or a repeated id.
+  Cancelled bookings do not block a slot.
+- **Demo simulator** — `src/services/bookingSimulator.ts`: `reserveRoomDemo()` =
+  `Promise` + `setTimeout`, random delay 1000–1500 ms, ~70% success / ~30% simulated
+  conflict, typed result `{ kind: 'success', booking } | { kind: 'conflict', slotKey }`.
+  The file header states it is not concurrency control and must not be reused as one.
+- **Booking flow** (`RoomDetailsScreen`) — "Đặt phòng" shows an `ActivityIndicator` and is
+  disabled while in flight; a synchronous ref guard blocks a double tap before re-render.
+  Success → booking built with `userId: 'demo-user'`, `status: 'confirmed'`, `createdAt`,
+  saved through the store, and **only then** navigate to `BookingSuccess` with `bookingId`.
+  Booking is also blocked until saved bookings have finished loading.
+- **Conflict UX** — alert with the exact title "Đặt phòng không thành công" and message
+  "Rất tiếc, phòng này vừa được người khác đặt thành công."; the slot is marked conflicted and
+  disabled ("Unavailable"); the user stays on the room; an Alternatives section suggests
+  other free slots of the same room on that date, or — if none — up to 3 similar rooms
+  (`src/utils/similar-rooms.ts`: shared equipment, ≤ 6 seats difference, same building
+  ranked first, excluding rooms already taken or conflicted for that slot).
+- **Honesty line added** — the Alternatives section says "Demo mode: this conflict was
+  simulated (about 30% of attempts). No other user booked this room." The required message
+  itself says another person booked the room, which conflicts with this task's own rule
+  "never describe random failure as real multi-user conflict"; the required copy is kept
+  word for word, and this one line reconciles the two. Delete it if not wanted.
+- `BookingSuccessScreen` shows the saved booking; `MyBookingsScreen` shows how many
+  confirmed bookings are saved on the device (makes persistence visible; the full list is
+  MVP-05). `AppButton` gained a `loading` prop; `SlotCard` gained `booked` / `conflicted`.
+Deliberate MVP exceptions to CLAUDE.md (production rules unchanged):
+1. **§10 / I8** forbid random outcomes; this task requires a random 70/30 simulator. Allowed
+   for the demo only, labelled everywhere, never presented as real concurrency.
+2. **§5** keeps bookings out of Zustand (they are server state). The MVP has no server, so
+   demo bookings live in Zustand + AsyncStorage by this task's instruction.
+Verification:
+  npm run typecheck    → PASS (exit 0)
+  npm run lint         → PASS (exit 0, after an auto-fixed import-order nit)
+  npm run format:check → PASS (exit 0)
+  Real store + simulator run in Node (only AsyncStorage replaced by an in-memory stand-in)
+    → 32/32 PASS:
+    slot key: spec example format; deterministic; room/date/slot each change the key
+    10 sequential attempts with real delays → 7 success / 3 conflict (a second run: 8 / 2),
+      every attempt 1000–1500 ms
+    1000 parallel attempts → 69.6% success / 30.4% conflict (second run 67.7% / 32.3%);
+      delays min 1000–1001 ms, max 1500 ms
+    duplicates: same slot new id → rejected; same id → rejected; two successful results for
+      one slot ("double tap") → one booking; cancel frees the slot for rebooking
+    conflicts: mark idempotent, clear works; filters: all toggles work
+    persistence: only `bookings` stored; after a simulated app restart (store re-created
+      over the same storage) all bookings are restored, filters/conflicts reset, and the
+      same confirmed slot is still rejected; malformed saved entries are dropped
+    similar rooms: 3 results, all share equipment within 6 seats, same building first
+  Metro bundle → PASS — android and ios HTTP 200 (1391 modules); zero `@firebase/` code
+Known issues:
+- **Found and fixed during verification:** with unreadable saved data, zustand's `persist`
+  swallows the parse error and never marks the store hydrated — booking would have stayed
+  disabled forever ("Loading your saved bookings…"). Hydration is now tracked through
+  `onRehydrateStorage`, which settles on failure too; the store starts empty and booking
+  works (3 added checks cover this).
+- **Manual on-device steps not run** (spinner visible, alert shown, disabled slot, restart
+  persistence on a real device) — no device or simulator here. The logic behind every
+  step is verified above.
+- Demo bookings are device-local: reinstalling the app or clearing its data removes them.
+- The UI is English except the Vietnamese copy this task specifies.
+Commit: `feat(mvp): add local booking and conflict simulation`
+Next: MVP-05
+
 ---
 
 ## Current state
