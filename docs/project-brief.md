@@ -151,10 +151,50 @@ Firestore Security Rules         the ONLY server-side enforcement
 - The client **reads** Firestore directly — fast, realtime, rule-scoped.
 - The client **writes** bookings and locks directly too, but **only** through a
   transaction whose shape Security Rules independently verify.
-- Pure domain logic (`buildSlotKey`, `decideBookingOutcome`, `deriveRoomStatus`) is
-  framework-free and shared between the app and its tests.
+- Pure logic (`buildSlotKey`, `decideBookingOutcome`, `deriveRoomStatus`) lives in
+  `src/utils/`, is framework-free, and is shared between the app and its tests.
 - The only non-app code is a **local seed script**, run by a developer from a workstation.
   It is not deployed and is not a runtime backend.
+
+### Source layout (final — locked in TASK 03)
+
+The app is organized **by kind**, in a flat `src/` tree. An earlier draft proposed a
+`features/ domain/ lib/ theme/ app/` layout; that proposal was rejected and removed. Only
+this structure exists:
+
+```
+src/
+├── components/   reusable UI components
+├── screens/      screen-level UI composition
+├── navigation/   React Navigation config + typed params
+├── store/        Zustand client state
+├── services/     Firebase / Firestore service layer  ← the only place Firebase is imported
+├── hooks/        reusable React hooks
+├── types/        domain + application types (pure)
+├── data/         static configuration and seed-related local data (pure)
+├── utils/        pure functions
+└── providers/    React providers (e.g. TanStack Query)
+```
+
+The dependency direction is `screens/components → hooks → services → types/data/utils`.
+The pure layer (`types/`, `data/`, `utils/`) imports no React, no Firebase and nothing
+from the layers above it, which is what keeps the booking rules testable without mocks.
+Modules are imported through the `@/*` alias (`@/types/room`), never deep relative paths.
+
+**Domain types** (one canonical definition each, all Firebase-free):
+
+| File | Defines |
+|---|---|
+| `src/types/room.ts` | `Building`, `Equipment`, `Room` |
+| `src/types/slot.ts` | `TimeSlot` |
+| `src/types/booking.ts` | `BookingStatus`, `Booking`, `SlotLock` |
+| `src/types/filters.ts` | `RoomFilters` |
+| `src/types/session.ts` | `UserSession` |
+| `src/data/time-slots.ts` | `TIME_SLOTS` (the four fixed slots) and the derived `SlotId` union |
+
+Time slots are a **closed set** — `07:30-09:30`, `09:30-11:30`, `13:00-15:00`,
+`15:00-17:00`. `SlotId` is derived from the definition itself, so an arbitrary
+user-entered time is not representable in the type system.
 
 ## Data flow
 

@@ -81,20 +81,29 @@ task works. "It compiles" is never sufficient on its own.
   deliberately added `any` fails lint.
 - **Commit:** `chore(tooling): enable strict typescript, eslint and prettier (TASK 02)`
 
-### TASK 03 — Folder architecture + domain types
-- **Objective:** Lock the layer boundaries and the vocabulary of the domain.
+### TASK 03 — Final architecture + domain types
+- **Objective:** Lock the one and only folder architecture, and define the vocabulary of
+  the domain.
 - **Dependencies:** TASK 02.
-- **Implementation scope:** `src/{app,features,components,hooks,services,domain,lib,theme}`
-  skeleton; domain types `Room`, `Building`, `TimeSlot`, `SlotId`, `BookingStatus`,
-  `Booking`, `SlotLock`, `RoomFilters`, `BookingError`; the pure **`buildSlotKey()`**
-  function (`roomId_date_slotId`) plus slot/date helpers. Lint rule forbidding
-  `services` → `features` imports.
-- **Acceptance criteria:** the domain module imports nothing from React, Firebase or
-  `services`; `buildSlotKey` is the single definition of the lock key and is unit tested;
-  ids are branded/typed, not bare strings.
-- **Verification:** `npm run typecheck` clean; `grep` shows zero React/Firebase imports
-  under `src/domain`; `buildSlotKey` tests pass including a date-format edge case.
-- **Commit:** `feat(domain): add folder architecture and core domain types (TASK 03)`
+- **Implementation scope:** confirm the flat by-kind `src/` tree as final —
+  `components`, `screens`, `navigation`, `store`, `services`, `hooks`, `types`, `data`,
+  `utils`, `providers` — and delete every trace of the earlier
+  `app/features/domain/lib/theme` proposal from the planning documents.
+  Domain types in `src/types/**`: `Building`, `Equipment`, `Room` (`room.ts`);
+  `TimeSlot` (`slot.ts`); `BookingStatus`, `Booking`, `SlotLock` (`booking.ts`);
+  `RoomFilters` (`filters.ts`); `UserSession` (`session.ts`).
+  The four fixed slots plus the derived `SlotId` union in `src/data/time-slots.ts`.
+  Types only — **no pure logic functions, no business logic, no feature code.**
+- **Acceptance criteria:** `src/types/**` and `src/data/**` import nothing from React,
+  Firebase, `services/`, `hooks/` or any UI folder; every domain type has exactly one
+  canonical definition; exactly four time slots exist and arbitrary times are
+  unrepresentable; ids are plain `string` (deliberately not branded — the scope does not
+  justify the ceremony); all four planning documents describe the same architecture.
+- **Verification:** `npm run typecheck` and `npm run lint` clean; `grep` shows zero
+  React/Firebase imports under `src/types` and `src/data`; a throwaway type probe proves
+  an invalid building, equipment, slot id or status fails to compile, that
+  `TIME_SLOTS.length` is exactly `4`, and that `readonly` blocks mutation.
+- **Commit:** `feat(types): lock final architecture and add domain types (TASK 03)`
 
 ### TASK 04 — Environment config
 - **Objective:** Typed, validated runtime configuration with no secrets in git.
@@ -144,9 +153,13 @@ task works. "It compiles" is never sufficient on its own.
 - **Implementation scope:** documented model and typed `FirestoreDataConverter` for
   `rooms`, `bookings`, **`slotLocks`**, `users`; `firestore.indexes.json` covering the
   planned queries (my bookings by user + date, today's active locks).
-  `slotLocks/{slotKey}` document id is `roomId_date_slotId`, produced only by
-  `buildSlotKey()`. `rooms` documents carry **no** persisted availability field.
+  `slotLocks/{slotKey}` document id is `roomId_date_slotId`. **This task creates the pure
+  `buildSlotKey()` in `src/utils/`** (deferred from TASK 03, which is types-only) and it
+  is the sole producer of that key. `rooms` documents carry **no** persisted availability
+  field.
 - **Acceptance criteria:** every collection has a type + converter + validation;
+  `buildSlotKey()` is the single definition of the lock key, is pure, and imports nothing
+  from Firebase;
   `createdAt` uses a server timestamp; no field is `any`; the booking document stores the
   `slotKey` it owns so cancellation can release the lock without recomputation;
   the model is documented in `docs/project-brief.md`.

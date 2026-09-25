@@ -50,22 +50,45 @@ runtime backend.
 
 ## 3. Architecture rules
 
+**The project is organized by kind, in a flat `src/` tree.** This is the single, final
+architecture (locked in TASK 03). There is no `features/`, `domain/`, `lib/`, `theme/` or
+`app/` folder — if you find one referenced anywhere, it is stale and wrong.
+
+```
+src/
+├── components/   reusable UI components
+├── screens/      screen-level UI composition
+├── navigation/   React Navigation config + typed params
+├── store/        Zustand client state
+├── services/     Firebase / Firestore service layer  ← only place Firebase may be imported
+├── hooks/        reusable React hooks
+├── types/        domain + application TypeScript types (pure)
+├── data/         static configuration and seed-related local data (pure)
+├── utils/        pure functions
+└── providers/    React providers (e.g. TanStack Query)
+```
+
 Layer boundaries are one-directional. A lower layer never imports an upper one.
 
 ```
-UI (screens, components)
-  -> hooks (queries, mutations, selectors)
-    -> services (repositories, Firestore SDK, transactions, listeners)
-      -> domain (types + pure logic; no I/O, no React, no Firebase)
+UI            screens/ + components/
+  -> hooks    hooks/          (queries, mutations, selectors)
+    -> services  services/    (repositories, Firestore SDK, transactions, listeners)
+      -> pure   types/ + data/ + utils/   (no I/O, no React, no Firebase)
 ```
 
-- **No Firebase SDK import inside a screen or component.** Ever. Firebase access lives
-  in `src/services/**` and is consumed through hooks.
-- Pure domain logic (slot key derivation, slot math, conflict rules, date policy, filter
-  predicates) must be **framework-free and unit-testable** with no mocks.
-- Feature code is organized by feature folder; shared code by kind.
+- **No Firebase SDK import inside a screen or component.** Ever. `firebase/firestore` and
+  `firebase/auth` may only be imported under `src/services/**`, and are consumed through hooks.
+- `types/`, `data/` and `utils/` are the pure layer: **framework-free and unit-testable with
+  no mocks**. They must not import React, Firebase, or anything from `services/`, `hooks/`,
+  `screens/`, `components/`, `store/`, `navigation/` or `providers/`.
+- Pure logic (slot key derivation, slot math, conflict rules, date policy, filter
+  predicates) lives in `utils/`; the vocabulary it operates on lives in `types/`.
 - Screens contain layout and wiring only. Business rules do not live in screens.
+- Navigation logic stays in `navigation/` and must not be mixed into pure logic.
+- Imports use the `@/*` alias (`@/types/room`), not deep relative paths. No second alias.
 - No circular imports. No barrel file that re-exports across layers.
+- Do not add abstraction that is not currently needed.
 
 ## 4. Source-of-truth rules (non-negotiable)
 
@@ -260,7 +283,8 @@ The 70/30 requirement is **traffic/scenario distribution**, never a forced outco
   Validate and narrow instead.
 - Every Firestore collection has an explicit type and a typed converter. Data crossing
   into the app is validated, not cast.
-- Shared domain types live in one place and are imported, never redeclared.
+- Domain types live in `src/types/**` — exactly one canonical definition each, imported
+  via `@/types/…` and never redeclared or duplicated in a component, service or store.
 - Navigation params, query keys, and env config are typed — no stringly-typed routes or keys.
 - Public functions have explicit return types. Errors are typed unions, not strings.
 

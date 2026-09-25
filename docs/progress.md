@@ -8,20 +8,22 @@ task's commit. Never report progress that has not been verified.
 ## Current state
 
 **Status:** READY FOR REVIEW
-**Current Task:** TASK 02 — Strict TypeScript, lint, format, aliases
+**Current Task:** TASK 03 — Final architecture + domain types
 **Completed Tasks:** TASK 00 (planning baseline), TASK 00B (architecture lock-in),
-TASK 01 (Expo scaffold, committed as `7b9f4f4`)
-**Next Task:** TASK 03 — Folder architecture + domain types
-**Known Issues:** one naming discrepancy to reconcile in TASK 03 — see Task 01 entry.
+TASK 01 (Expo scaffold, `7b9f4f4`), TASK 02 (strict TS + lint baseline, `3fef414`)
+**Next Task:** TASK 04 — Environment config
+**Known Issues:** none. The folder-architecture discrepancy carried since TASK 01 is
+**RESOLVED** — see AD-33.
 
-**Repository state:** planning documents plus an Expo SDK 57 + TypeScript scaffold with
-the code-quality baseline in place. Runtime dependencies: `expo`, `expo-status-bar`,
-`react`, `react-native`, `react-native-safe-area-context`. Dev dependencies:
-`typescript`, `@types/react`, `eslint`, `eslint-config-expo`, `prettier`.
-No Firebase, navigation, state, query, notification, QR or business code exists.
-Git repository on `main`; planning docs `bf07557`, scaffold `7b9f4f4`; the TASK 02
-tooling changes are **uncommitted and unpushed**, awaiting user review. Nothing may be
-pushed without explicit user approval.
+**Repository state:** planning documents, an Expo SDK 57 + TypeScript scaffold with the
+code-quality baseline, and the domain type layer. Runtime dependencies: `expo`,
+`expo-status-bar`, `react`, `react-native`, `react-native-safe-area-context`. Dev
+dependencies: `typescript`, `@types/react`, `eslint`, `eslint-config-expo`, `prettier`.
+No Firebase, navigation, state, query, notification, QR or business logic exists — the
+only code is types, static slot data, and the placeholder root screen.
+Git repository on `main`; planning docs `bf07557`, scaffold `7b9f4f4`, tooling `3fef414`;
+the TASK 03 changes are **uncommitted and unpushed**, awaiting user review. Nothing may
+be pushed without explicit user approval.
 
 **Blocked on:** nothing.
 
@@ -167,6 +169,49 @@ Known issues: none. The TASK 03 folder-naming discrepancy from Task 01 remains o
 is still owned by TASK 03.
 Next task: TASK 03
 
+## Task 03
+
+Status: READY FOR REVIEW — verification passed, awaiting user commit.
+Implemented:
+- **Final architecture selected and locked** (AD-33). The flat by-kind `src/` tree is now
+  the single architecture: `components`, `screens`, `navigation`, `store`, `services`,
+  `hooks`, `types`, `data`, `utils`, `providers`. The competing
+  `app/features/domain/lib/theme` proposal was rejected and removed from every planning
+  document, so no two architectures coexist.
+- **Domain types**, one canonical definition each, all Firebase-free:
+  `src/types/room.ts` (`Building`, `Equipment`, `Room`), `src/types/slot.ts` (`TimeSlot`),
+  `src/types/booking.ts` (`BookingStatus`, `Booking`, `SlotLock`),
+  `src/types/filters.ts` (`RoomFilters`), `src/types/session.ts` (`UserSession`).
+- **Fixed time slots** in `src/data/time-slots.ts`: exactly four —
+  07:30-09:30, 09:30-11:30, 13:00-15:00, 15:00-17:00 — declared
+  `as const satisfies readonly TimeSlot[]`, with `SlotId` derived from the definition so
+  an arbitrary user-entered time is not representable.
+- Server-owned entities (`Room`, `Booking`, `SlotLock`, `TimeSlot`) are fully `readonly`;
+  they are snapshots the client renders, never mutates.
+- Planning documents reconciled: CLAUDE.md §3 rewritten with the folder tree and the
+  layer→folder mapping, PLAN.md TASK 03 rewritten, project-brief.md gained a
+  "Source layout (final)" section with the type inventory.
+Verification:
+  npm run typecheck → PASS (exit 0)
+  npm run lint      → PASS (exit 0)
+Positive type probe (temporary, deleted): every type composes, `@/…` imports resolve, and
+a filter clears with an explicit `undefined`.
+Negative type probe (temporary, deleted): 7 expected compile errors — invalid building,
+invalid equipment, invalid slot id, invalid status, `TIME_SLOTS.length` proven to be
+exactly `4` (`Type '4' is not assignable to type '5'`), and `readonly` blocking mutation
+of both a `Room` field and a `TIME_SLOTS` entry.
+Grep confirms zero React/Firebase imports under `src/types` and `src/data`, and no
+duplicate definition of any domain type.
+Commit: not committed — user directed no commit.
+Known issues: none.
+Deviations from the earlier PLAN text, both deliberate and recorded:
+1. `buildSlotKey()` was **not** created here. This task is types-only per instruction, so
+   PLAN.md TASK 07 now explicitly owns creating it in `src/utils/`. It had to be rehomed
+   rather than dropped, since TASK 25 and TASK 29 depend on it.
+2. Ids are plain `string`, not branded types. The old PLAN text required branding; the
+   ceremony is not justified at this scope, and PLAN.md TASK 03 now says so.
+Next task: TASK 04
+
 ---
 
 ## Resolved open questions
@@ -254,7 +299,10 @@ the user, record the outcome here with the superseding decision, and update `CLA
 | AD-12 | Lists over ~30 items use `FlatList` with memoized rows, stable `keyExtractor` and `getItemLayout`. | The 120+ room requirement is a render-churn problem. | Fixed |
 | AD-13 | **Search/filter is in-memory**: Firestore → TanStack Query → 120+ rooms → 300 ms debounce → `useMemo` → `FlatList`. No server-side search, Algolia or Elasticsearch. | At 120 documents the bottleneck is re-render churn, not I/O. | **Fixed (TASK 00B)** — was open |
 | AD-32 | **Room status is derived**, never stored. "Occupied" = a confirmed booking covers now; "Available Now" = none does. Booking-based availability, not sensor occupancy. | A stored flag goes stale the moment a lock changes. | Fixed (TASK 00B) |
-| AD-15 | Pure domain logic (`buildSlotKey`, `decideBookingOutcome`, `deriveRoomStatus`) is framework-free and shared between app and tests. | The slot key must have exactly one definition. | Fixed |
+| AD-15 | Pure logic (`buildSlotKey`, `decideBookingOutcome`, `deriveRoomStatus`) lives in `src/utils/`, is framework-free, and is shared between app and tests. | The slot key must have exactly one definition. | Fixed |
+| AD-33 | **Final architecture: flat by-kind `src/` tree** — `components`, `screens`, `navigation`, `store`, `services`, `hooks`, `types`, `data`, `utils`, `providers`. The `app/features/domain/lib/theme` proposal is rejected and removed. Layers: `screens/components → hooks → services → types/data/utils`; Firebase only under `services/`; imports via `@/*`. | A mini-project does not need feature-slicing; by-kind is simpler to navigate, already matches the scaffold, and still expresses the layer boundary that the booking rules depend on. Two parallel architectures were a live contradiction. | **Fixed (TASK 03)** — resolves the TASK 01 discrepancy |
+| AD-34 | Domain types are Firebase-free, live one-per-concern in `src/types/**`, and server-owned entities are fully `readonly`. Ids are plain `string`, not branded. | Keeps the pure layer testable without mocks and prevents accidental mutation of server snapshots; branding is ceremony this scope does not need. | Fixed (TASK 03) |
+| AD-35 | Time slots are a **closed set of exactly four**, with `SlotId` derived from the definition via `as const satisfies`. | An arbitrary user-entered time must be unrepresentable, and slot ids are persisted inside the slot lock key — changing one is a data migration. | Fixed (TASK 03) |
 | AD-20 | Single campus timezone; dates as `yyyy-MM-dd`; slots from a shared definition. | Avoids an entire class of off-by-one-day booking bugs. | Fixed |
 
 ### Process
