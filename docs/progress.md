@@ -142,6 +142,69 @@ Known issues:
 Commit: `feat(mvp): add debounced search and room filters`
 Next: MVP-03
 
+## MVP-03
+
+Status: READY FOR REVIEW
+Implemented:
+- **Dependencies** (via `npx expo install`, all SDK 57 compatible — `expo install --check`
+  reports "Dependencies are up to date"): `@react-navigation/native@^7.4.1`,
+  `@react-navigation/native-stack@^7.19.2`, `@react-navigation/bottom-tabs@^7.19.2`,
+  `react-native-screens@~4.26.0`, `react-native-safe-area-context@~5.7.0` (already present),
+  and `date-fns@^4.4.0` for the date selector. No icon or gesture library.
+- **Typed navigation** — `src/navigation/types.ts`: `RootStackParamList`
+  (`MainTabs`, `RoomDetails: { roomId: string }`, `BookingSuccess: { bookingId: string }`),
+  `MainTabParamList` (`BrowseRooms`, `MyBookings`), plus `RootStackScreenProps` and
+  `MainTabScreenProps` (composite, so a tab screen can open root routes). `MainTabs` is
+  typed `NavigatorScreenParams<MainTabParamList> | undefined` — React Navigation's nested
+  navigator convention; plain `undefined` still works as specified.
+- **Navigators** — `src/navigation/RootNavigator.tsx`: native stack
+  `MainTabs → RoomDetails → BookingSuccess`, with `RoomDetails` and `BookingSuccess` outside
+  the tabs; bottom tabs `BrowseRooms` / `MyBookings` (label-only, no icon library).
+  `App.tsx` wraps it in `NavigationContainer` with a token-based theme, inside
+  `SafeAreaProvider` and `QueryProvider`.
+- **Browse → details** — `RoomCard` is now pressable; the screen passes one stable
+  `openRoom` callback, so `React.memo` still holds. It navigates with `{ roomId }` only.
+- **`RoomDetailsScreen`** — reads the room with the new `useRoom(roomId)`, which selects from
+  the same `['rooms']` cache (no second fetch). Shows image, name, building, floor, capacity,
+  equipment badges and the demo status ("Demo status, not live occupancy"). Handles loading,
+  error and unknown-id states.
+- **Date selector** — horizontal `FlatList` of `DateChip`s: 7 days starting today, keys in
+  `yyyy-MM-dd` via `date-fns` (`src/utils/booking-dates.ts`, pure; the current time is
+  passed in). `src/hooks/useNow.ts` ticks every minute so "today" and past slots stay right
+  while the screen is open.
+- **Fixed slots** — the existing `TIME_SLOTS`, exactly 07:30–09:30, 09:30–11:30, 13:00–15:00,
+  15:00–17:00, in a 2-column `FlatList` of `SlotCard`s; no time input exists. A slot counts
+  as past **from its start minute** (a slot already under way cannot be booked), and past
+  slots are disabled.
+- **"Đặt phòng" button** in a fixed bottom bar — disabled until a date inside the 7-day window
+  **and** a slot that has not started are both selected. Pressing it only shows a
+  placeholder alert; **no booking is created** (MVP-04).
+- `BookingSuccessScreen` (shows the `bookingId`, "Back to rooms" → `popToTop`) and
+  `MyBookingsScreen` (placeholder) are registered.
+Verification:
+  npm run typecheck    → PASS (exit 0)
+  npm run lint         → PASS (exit 0)
+  npm run format:check → PASS (exit 0, after Prettier re-wrapped `RootNavigator.tsx`)
+  npx expo install --check → PASS ("Dependencies are up to date")
+  Date/slot logic (real helpers) → 12/12 PASS: 7 consecutive days from today, all
+    `YYYY-MM-DD`; month and year boundaries (2026-12-29 → 2027-01-04); exactly 4 fixed
+    slots; at 10:00 today 07:30 and 09:30 are past, 13:00 and 15:00 open; tomorrow none past;
+    past from the exact start minute (12:59 open, 13:00 past); invalid date never selectable
+  Navigation type probe (temporary, deleted) → the 5 valid calls compile; all 5 invalid
+    calls are compile errors: numeric `roomId`, missing params, unknown route, `roomId` passed
+    to `BookingSuccess`, empty params
+  Metro bundle → PASS — android and ios HTTP 200 (1379 modules)
+Known issues:
+- **Manual navigation checks not run on a device** (open browse, tap card, back, 7 dates,
+  4 slots, past slots disabled, button enabling) — no device or simulator here. Logic and
+  types behind each check are verified above.
+- Tabs are label-only because no icon library is installed (the task limits dependencies).
+- The UI is English except the Vietnamese copy this task specifies ("Đặt phòng"); pick one
+  language before submission.
+- Times use the device's local timezone; the MVP assumes the device is on campus time.
+Commit: `feat(mvp): add typed navigation and room details`
+Next: MVP-04
+
 ---
 
 ## Current state

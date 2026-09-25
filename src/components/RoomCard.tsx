@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { memo, useCallback } from 'react';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
@@ -28,6 +28,8 @@ export function getRoomStatusLabel(status: RoomStatus): string {
 export interface RoomCardProps {
   readonly room: Room;
   readonly status: RoomStatus;
+  /** Called with the room id. Pass a stable callback so memoization holds. */
+  readonly onPress: (roomId: string) => void;
 }
 
 /**
@@ -37,36 +39,47 @@ export interface RoomCardProps {
  * cache plus a primitive status string, so a row re-renders only when its own
  * data changes — not when the list scrolls, filters change, or a sibling updates.
  */
-export const RoomCard = memo(function RoomCard({ room, status }: RoomCardProps) {
+export const RoomCard = memo(function RoomCard({ room, status, onPress }: RoomCardProps) {
   const isAvailable = status === 'available';
   const statusLabel = getRoomStatusLabel(status);
+  const handlePress = useCallback(() => {
+    onPress(room.id);
+  }, [onPress, room.id]);
 
   return (
     <View style={styles.row}>
-      <Card
-        style={styles.card}
-        accessible
+      <Pressable
+        accessibilityRole="button"
         accessibilityLabel={`${room.name}, building ${room.building}, floor ${room.floor}, ${room.capacity} seats, ${statusLabel}`}
+        accessibilityHint="Opens room details"
+        onPress={handlePress}
+        style={({ pressed }) => pressed && styles.pressed}
       >
-        <Image source={{ uri: room.image }} style={styles.image} accessibilityIgnoresInvertColors />
-        <View style={styles.body}>
-          <AppText variant="heading" numberOfLines={1}>
-            {room.name}
-          </AppText>
-          <AppText variant="caption" color="textSecondary" numberOfLines={1}>
-            Building {room.building} · Floor {room.floor}
-          </AppText>
-          <AppText variant="caption" color="textSecondary" numberOfLines={1}>
-            {room.equipment.join(' · ')}
-          </AppText>
-          <View style={styles.statusRow}>
-            <Badge label={statusLabel} tone={isAvailable ? 'success' : 'error'} />
-            <AppText variant="caption" color="text" numberOfLines={1} style={styles.capacity}>
-              {room.capacity} seats
+        <Card style={styles.card}>
+          <Image
+            source={{ uri: room.image }}
+            style={styles.image}
+            accessibilityIgnoresInvertColors
+          />
+          <View style={styles.body}>
+            <AppText variant="heading" numberOfLines={1}>
+              {room.name}
             </AppText>
+            <AppText variant="caption" color="textSecondary" numberOfLines={1}>
+              Building {room.building} · Floor {room.floor}
+            </AppText>
+            <AppText variant="caption" color="textSecondary" numberOfLines={1}>
+              {room.equipment.join(' · ')}
+            </AppText>
+            <View style={styles.statusRow}>
+              <Badge label={statusLabel} tone={isAvailable ? 'success' : 'error'} />
+              <AppText variant="caption" color="text" numberOfLines={1} style={styles.capacity}>
+                {room.capacity} seats
+              </AppText>
+            </View>
           </View>
-        </View>
-      </Card>
+        </Card>
+      </Pressable>
     </View>
   );
 });
@@ -75,6 +88,9 @@ const styles = StyleSheet.create({
   row: {
     height: ROOM_ROW_HEIGHT,
     paddingBottom: ROOM_CARD_GAP,
+  },
+  pressed: {
+    opacity: 0.85,
   },
   card: {
     height: ROOM_CARD_HEIGHT,

@@ -14,6 +14,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { getMockRoomStatus } from '@/utils/mock-room-status';
 import { filterRooms, hasActiveFilters } from '@/utils/room-filters';
 
+import type { MainTabScreenProps } from '@/navigation/types';
 import type { Building, Equipment, Room, RoomStatus } from '@/types/room';
 import type { JSX } from 'react';
 
@@ -63,7 +64,7 @@ function toggleInList<T>(list: readonly T[], item: T): readonly T[] {
  * Rooms come from `useRooms()` (TanStack Query over the room repository) and are
  * never copied into state; only the filter criteria are local UI state.
  */
-export function BrowseRoomsScreen(): JSX.Element {
+export function BrowseRoomsScreen({ navigation }: MainTabScreenProps<'BrowseRooms'>): JSX.Element {
   const { data: rooms, isPending, isError, refetch } = useRooms();
 
   const [searchText, setSearchText] = useState('');
@@ -105,9 +106,19 @@ export function BrowseRoomsScreen(): JSX.Element {
     return map;
   }, [allRooms]);
 
+  // Stable across renders (navigation is stable), so memoized cards stay memoized.
+  const openRoom = useCallback(
+    (roomId: string) => {
+      navigation.navigate('RoomDetails', { roomId });
+    },
+    [navigation],
+  );
+
   const renderItem = useCallback<ListRenderItem<Room>>(
-    ({ item }) => <RoomCard room={item} status={statusById.get(item.id) ?? 'available'} />,
-    [statusById],
+    ({ item }) => (
+      <RoomCard room={item} status={statusById.get(item.id) ?? 'available'} onPress={openRoom} />
+    ),
+    [statusById, openRoom],
   );
 
   const isBuildingSelected = useCallback((option: Building) => option === building, [building]);
