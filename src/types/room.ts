@@ -29,3 +29,11 @@ export interface Room {
   readonly equipment: readonly Equipment[];
   readonly image: string;
 }
+
+/**
+ * Whether a room is free right now. Always *derived*, never stored on `Room`.
+ *
+ * Production derives it from active slot locks (PLAN.md TASK 19). The emergency
+ * MVP uses a deterministic mock — see `src/utils/mock-room-status.ts`.
+ */
+export type RoomStatus = 'available' | 'occupied';

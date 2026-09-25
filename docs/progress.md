@@ -5,6 +5,88 @@ task's commit. Never report progress that has not been verified.
 
 ---
 
+## Emergency Submission MVP (active track)
+
+**The production Firebase track is PAUSED** for the submission deadline. The MVP is a
+temporary implementation that runs on local mock data. The production architecture, the
+roadmap in `PLAN.md`, and the decision register below are **unchanged and still
+authoritative**; nothing here overrides them. TASK 06 (Firebase wiring) was rolled back
+before commit and is not in the repository.
+
+MVP rules: no Firebase, no network, no API. Mock data is labelled as mock and is never
+presented as server data. Code still follows the locked architecture (`screens → hooks →
+services → types/data/utils`), so production can replace the mock repository without
+touching the screen.
+
+## MVP-01
+
+Status: READY FOR REVIEW
+Implemented:
+- **120 mock rooms** — `src/data/rooms.ts`: a deterministic generator (no `Math.random`),
+  4 buildings × 5 floors × 6 rooms = A 30 / B 30 / C 30 / V 30. Ids `room-<code>` (e.g.
+  `room-B205`), unique names ("Study Room A101", "Computer Lab V203"), capacity 2–20,
+  valid equipment in 10 distinct combinations, every V room a computer lab with a
+  High-spec PC, placeholder images via `picsum.photos` seeded by room code. Uses the
+  existing `Room` type; no dataset duplicated.
+- **Room repository** — `src/services/room-repository.ts`: `fetchRooms()` returns the
+  mock catalogue. No Firebase, no network, no fake latency.
+- **TanStack Query** — `@tanstack/react-query@^5.103.2` added (PLAN.md TASK 11/13 put room
+  reads in the server-state layer). `src/providers/QueryProvider.tsx` (one client, created
+  once), `src/hooks/query-keys.ts` (typed factory, `roomKeys.all` = `['rooms']`),
+  `src/hooks/use-rooms.ts` (`useQuery` over the repository). Rooms are never copied into
+  client state.
+- **Base UI primitives** (TASK 05B was pending) — `src/components/ui/`: `AppText`,
+  `AppButton`, `Card`, `Badge`, `AppInput`, `Screen`, `EmptyState`, `Skeleton`. All
+  values come from `src/data/theme.ts`; no second theme, no hard-coded colours. `AppButton`
+  and `AppInput` meet the 44pt touch target. `Skeleton` is static (motion is TASK 40).
+- **SafeAreaProvider** at the application root (`App.tsx`); `Screen` applies insets via
+  `SafeAreaView`. No navigation.
+- **`RoomCard`** — `src/components/RoomCard.tsx`: `React.memo`, fixed height
+  (`ROOM_CARD_HEIGHT` 128 + 16 gap = `ROOM_ROW_HEIGHT` 144), every text line clamped to one
+  line so the card cannot grow. Shows image, name, building, floor, capacity, equipment,
+  and an Available/Occupied badge.
+- **Mock status** — `RoomStatus` type added to `src/types/room.ts` (the `Room` type itself
+  still has **no** status field, per CLAUDE.md §7); `src/utils/mock-room-status.ts` is a pure,
+  deterministic placeholder (80 available / 40 occupied), explicitly not real availability.
+  Computed once per dataset in a `useMemo` map, not inside `renderItem`.
+- **`BrowseRoomsScreen`** — `src/screens/BrowseRoomsScreen.tsx`: title, room count, a
+  read-only search placeholder, building-chip filter placeholder, then the feed as a
+  `FlatList` with module-scope `keyExtractor` and `getItemLayout`,
+  `initialNumToRender={10}`, `maxToRenderPerBatch={10}`, `windowSize={7}`,
+  `removeClippedSubviews`, and a memoized `renderItem`. The header sits **above** the list
+  rather than in `ListHeaderComponent`, so row N is exactly at N × 144. Loading shows
+  skeleton rows; errors show a retryable `EmptyState`.
+- `App.tsx` keeps the side-effect import of `@/services/config`, so TASK 04's
+  fail-loudly `.env` validation still runs at startup.
+Verification:
+  npm run typecheck    → PASS (exit 0)
+  npm run lint         → PASS (exit 0)
+  npm run format:check → PASS (exit 0)
+  Dataset (real generator run in Node) → 15/15 checks PASS: 120 rooms; A/B/C/V = 30 each;
+    120 unique ids; 120 unique names; capacity 2–20 (8 distinct); equipment valid, no
+    duplicates, all 4 types present; all V rooms have a High-spec PC; floors 1–5; https
+    images; output identical across loads; mock status deterministic with both values
+  Structure → FlatList used (no ScrollView anywhere in src/); getItemLayout, keyExtractor
+    and all four required tuning props present; RoomCard wrapped in React.memo
+  No `any` / `@ts-ignore` / `@ts-nocheck`; no Firebase import; no hex colour outside theme
+  Metro bundle → PASS — android and ios HTTP 200 (813 modules); screen, TanStack Query and
+    SafeAreaProvider present; zero `@firebase/` code in the bundle
+Known issues:
+- **On-device launch not verified** — no device or simulator in this environment. Bundling
+  both platforms is the proxy that was run; confirm with `npx expo start` + Expo Go.
+- Room images are remote (`picsum.photos`) and need internet; offline, each card shows its
+  grey placeholder instead.
+- Fixed-height cards clamp text to one line. At very large accessibility font sizes, text is
+  truncated rather than wrapped — a deliberate trade-off for a predictable `getItemLayout`.
+- Found and fixed during verification: the first generator gave **every** room AC (the
+  equipment index was always odd, so only half the combinations were ever chosen). Fixed by
+  indexing on `unit + floor`; AC is now in 90 of 120 rooms.
+- Search and filters are visual placeholders only (MVP-02).
+Commit: `feat(mvp): build optimized 120-room discovery`
+Next: MVP-02
+
+---
+
 ## Current state
 
 **Status:** READY FOR REVIEW
