@@ -8,18 +8,20 @@ task's commit. Never report progress that has not been verified.
 ## Current state
 
 **Status:** READY FOR REVIEW
-**Current Task:** TASK 01 — Expo + TypeScript scaffold
-**Completed Tasks:** TASK 00 (planning baseline), TASK 00B (architecture lock-in)
-**Next Task:** TASK 02 — Strict TypeScript, lint, format, aliases
+**Current Task:** TASK 02 — Strict TypeScript, lint, format, aliases
+**Completed Tasks:** TASK 00 (planning baseline), TASK 00B (architecture lock-in),
+TASK 01 (Expo scaffold, committed as `7b9f4f4`)
+**Next Task:** TASK 03 — Folder architecture + domain types
 **Known Issues:** one naming discrepancy to reconcile in TASK 03 — see Task 01 entry.
 
-**Repository state:** planning documents plus an Expo SDK 57 + TypeScript scaffold.
-Dependencies installed: `expo`, `expo-status-bar`, `react`, `react-native`,
-`react-native-safe-area-context`, `typescript`, `@types/react` — nothing else.
+**Repository state:** planning documents plus an Expo SDK 57 + TypeScript scaffold with
+the code-quality baseline in place. Runtime dependencies: `expo`, `expo-status-bar`,
+`react`, `react-native`, `react-native-safe-area-context`. Dev dependencies:
+`typescript`, `@types/react`, `eslint`, `eslint-config-expo`, `prettier`.
 No Firebase, navigation, state, query, notification, QR or business code exists.
-Git repository on `main`; planning docs committed as `bf07557`; the TASK 01 scaffold is
-**uncommitted and unpushed**, awaiting user review. Nothing may be pushed without
-explicit user approval.
+Git repository on `main`; planning docs `bf07557`, scaffold `7b9f4f4`; the TASK 02
+tooling changes are **uncommitted and unpushed**, awaiting user review. Nothing may be
+pushed without explicit user approval.
 
 **Blocked on:** nothing.
 
@@ -120,6 +122,50 @@ Known issues: the `src/` folder list specified for TASK 01 (`store`, `types`, `d
 TASK 03 (`app`, `features`, `domain`, `lib`, `theme`). Both were left as-is rather than
 silently reconciled; TASK 03 owns the final architecture and must resolve the naming.
 Next task: TASK 02
+
+## Task 02
+
+Status: READY FOR REVIEW — verification passed, awaiting user commit.
+Implemented: code-quality baseline making the CLAUDE.md §11 TypeScript rules
+mechanically enforced instead of conventional. No domain model, no architecture change.
+- `tsconfig.json`: added the four strict-family flags required by CLAUDE.md §11
+  (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`,
+  `noFallthroughCasesInSwitch`) on top of `strict: true`, plus the `@/*` → `./src/*`
+  path alias. `baseUrl` was deliberately **not** used — TypeScript 6 errors on it
+  (TS5101, deprecated); `paths` resolves relative to the config file instead.
+- ESLint 9 flat config via `npx expo lint` → `eslint.config.js` extending
+  `eslint-config-expo/flat`, which already bundles `@typescript-eslint`, `import`,
+  `react` and `react-hooks`, so no extra plugins were installed. Rule overrides:
+  `no-explicit-any` error, `ban-ts-comment` error (`@ts-ignore`/`@ts-nocheck` banned,
+  `@ts-expect-error` allowed only with a description), `no-unused-vars` error
+  (`_` prefix opts out), `react-hooks/rules-of-hooks` and `exhaustive-deps` errors,
+  `import/order` with enforced grouping/alphabetization, `import/no-duplicates`.
+- Prettier added with `.prettierrc` and `.prettierignore`. Markdown is ignored so the
+  hand-formatted planning documents are never reflowed, and `tsconfig.json` is ignored
+  because the Expo CLI rewrites its formatting on every start.
+- `.gitattributes` added (`* text=auto eol=lf`) so `prettier --check` behaves identically
+  on Windows, macOS and CI rather than passing locally and failing elsewhere.
+- Scripts: `typecheck`, `lint`, `lint:fix`, `format`, `format:check`. The `lint` script
+  is `eslint .` rather than `expo lint`, because `expo lint` targets `src/` and currently
+  fails ("all files matching the glob are ignored") while `src/` holds only `.gitkeep`.
+- `App.tsx`: import order corrected by `eslint --fix` (type import moved into its own
+  group). This is the only source change and it adds no logic.
+Verification:
+  npm run typecheck   → PASS (exit 0)
+  npm run lint        → PASS (exit 0)
+  npm run format:check → PASS (exit 0)
+  tsc --showConfig    → strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes,
+                        noImplicitOverride, noFallthroughCasesInSwitch all true
+Negative test (temporary probe file, deleted afterwards) confirmed all four rule classes
+are errors, not warnings: unused imports, `@ts-ignore`, `any`, and a missing hook
+dependency — 5 errors, exit 1.
+Alias test (temporary probe files, deleted afterwards): `@/…` resolved in TypeScript
+(`tsc --noEmit` exit 0) **and** through Metro — an Android bundle returned HTTP 200 with
+the aliased module's value present in the compiled output.
+Commit: not committed — user directed no commit.
+Known issues: none. The TASK 03 folder-naming discrepancy from Task 01 remains open and
+is still owned by TASK 03.
+Next task: TASK 03
 
 ---
 

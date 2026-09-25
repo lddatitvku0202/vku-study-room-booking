@@ -1,0 +1,14 @@
+node_modules/
+.expo/
+dist/
+coverage/
+android/
+ios/
+package-lock.json
+assets/
+
+# Markdown is hand-formatted (planning docs) — do not reflow
+*.md
+
+# Expo CLI rewrites tsconfig.json formatting on start — let it own that file
+tsconfig.json

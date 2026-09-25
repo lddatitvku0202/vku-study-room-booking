@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
-import type { JSX } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+
+import type { JSX } from 'react';
 
 /**
  * Placeholder root component for TASK 01 (scaffold only).
