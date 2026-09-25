@@ -8,22 +8,24 @@ task's commit. Never report progress that has not been verified.
 ## Current state
 
 **Status:** READY FOR REVIEW
-**Current Task:** TASK 03 — Final architecture + domain types
+**Current Task:** TASK 04 — Environment config
 **Completed Tasks:** TASK 00 (planning baseline), TASK 00B (architecture lock-in),
-TASK 01 (Expo scaffold, `7b9f4f4`), TASK 02 (strict TS + lint baseline, `3fef414`)
-**Next Task:** TASK 04 — Environment config
-**Known Issues:** none. The folder-architecture discrepancy carried since TASK 01 is
-**RESOLVED** — see AD-33.
+TASK 01 (Expo scaffold, `7b9f4f4`), TASK 02 (strict TS + lint baseline, `3fef414`),
+TASK 03 (architecture + domain types, `092cdf4`)
+**Next Task:** TASK 05 — Theme and base UI primitives
+**Known Issues:** none. `.env` currently holds **placeholder** Firebase values so the app
+boots; TASK 06 replaces them with the real web config.
 
 **Repository state:** planning documents, an Expo SDK 57 + TypeScript scaffold with the
-code-quality baseline, and the domain type layer. Runtime dependencies: `expo`,
-`expo-status-bar`, `react`, `react-native`, `react-native-safe-area-context`. Dev
-dependencies: `typescript`, `@types/react`, `eslint`, `eslint-config-expo`, `prettier`.
-No Firebase, navigation, state, query, notification, QR or business logic exists — the
-only code is types, static slot data, and the placeholder root screen.
-Git repository on `main`; planning docs `bf07557`, scaffold `7b9f4f4`, tooling `3fef414`;
-the TASK 03 changes are **uncommitted and unpushed**, awaiting user review. Nothing may
-be pushed without explicit user approval.
+code-quality baseline, the domain type layer, and typed runtime configuration. Runtime
+dependencies: `expo`, `expo-constants`, `expo-status-bar`, `react`, `react-native`,
+`react-native-safe-area-context`. Dev dependencies: `typescript`, `@types/react`,
+`eslint`, `eslint-config-expo`, `prettier`.
+No Firebase SDK, navigation, state, query, notification, QR or business logic exists —
+the only code is types, static slot data, config parsing, and the placeholder root screen.
+Git repository on `main`; planning `bf07557`, scaffold `7b9f4f4`, tooling `3fef414`,
+types `092cdf4`; the TASK 04 changes are **uncommitted and unpushed**, awaiting user
+review. Nothing may be pushed without explicit user approval.
 
 **Blocked on:** nothing.
 
@@ -212,148 +214,54 @@ Deviations from the earlier PLAN text, both deliberate and recorded:
    ceremony is not justified at this scope, and PLAN.md TASK 03 now says so.
 Next task: TASK 04
 
----
+## Task 04
 
-## Resolved open questions
-
-All open questions from TASK 00 are closed by the user's decisions in TASK 00B.
-
-| # | Question | Resolution | Decision |
-|---|---|---|---|
-| OQ-1 | Firestore listeners vs TanStack Query ownership | **RESOLVED** — `onSnapshot` → `setQueryData`. TanStack Query is the single server-state owner; no parallel Zustand availability cache. | AD-10 |
-| OQ-2 | AsyncStorage cache vs availability freshness | **RESOLVED** — persist `rooms` and `profile` only. `slotLocks`, availability and `bookings` are never persisted. AsyncStorage never decides availability or booking success; server state wins on reconnect. | AD-06, AD-22 |
-| OQ-3 | Availability representation / deterministic key | **RESOLVED** — dedicated `slotLocks/{roomId_date_slotId}` collection. Slot-map-per-room-day and booking-as-lock both rejected. | AD-21 |
-| OQ-4 | Meaning of "70/30" | **RESOLVED** — traffic/scenario distribution with `Promise` + `setTimeout` pacing at 1–1.5 s. Real transactions only; fabricated outcomes forbidden. | AD-16 |
-| OQ-5 | QR scope | **RESOLVED** — display-only pass, payload `bookingId \| roomName \| date \| slotLabel`. No scanner dependency, no check-in backend. | AD-24 |
-| OQ-5b | Notification id storage | **RESOLVED** — Zustand `bookingId → notificationId` map persisted to AsyncStorage. Device-local limitation documented, not hidden. | AD-23 |
-| OQ-6 | Cloud Functions / Blaze requirement | **RESOLVED** — Cloud Functions removed from the project. Firebase Spark plan, no billing. Client transaction is the booking authority. | AD-02, AD-25 |
-| OQ-7 | Expo Go vs development build | **RESOLVED** — Expo Go for early development and core feature testing; a development build later only where native behaviour requires it. Not required in TASK 01. | AD-26 |
-| OQ-8 | Search strategy at 120+ rooms | **RESOLVED** — in-memory search/filter with 300 ms debounce and `useMemo`, by design. No server-side search, Algolia or Elasticsearch. | AD-13 |
-
----
-
-## Architectural decisions
-
-Decisions that future sessions **must not silently change**. To revisit one, raise it with
-the user, record the outcome here with the superseding decision, and update `CLAUDE.md`.
-
-### Backend and platform
-
-| # | Decision | Rationale | Status |
-|---|---|---|---|
-| AD-01 | Firestore is the single source of truth for `rooms`, `bookings`, `slotLocks`, `users`. | Multi-user correctness requires one authority. | Fixed |
-| AD-02 | **No Cloud Functions.** Booking authority is a **client `runTransaction()`**. | Student mini-project; must deploy without enabling billing. Firestore transactions are sufficient for atomic booking at this scope. | Fixed (TASK 00B) |
-| AD-25 | **Firebase Spark plan, no billing.** No feature requiring Blaze may be introduced. Docs state "Free quota applies within Firebase Spark plan limits." | Cost constraint of the project; Spark is not unlimited and quota must be budgeted. | Fixed (TASK 00B) |
-| AD-27 | Only Firebase Auth, Firestore and Security Rules are used at runtime. The seed script is a local developer tool, not a backend. | Keeps the deployable surface to client + rules + indexes. | Fixed (TASK 00B) |
-
-### Booking concurrency
-
-| # | Decision | Rationale | Status |
-|---|---|---|---|
-| AD-03 | Booking and slot lock are written in **one transaction**, never as two writes, never lock-then-booking or booking-then-lock. | Any split creates a window where the two disagree. | Fixed |
-| AD-21 | Availability lock is `slotLocks/{roomId}_{date}_{slotId}`. | Trivial uniqueness check, trivial release on cancel, history kept separate from availability, no room-day hotspot. | **Fixed (TASK 00B)** — was open |
-| AD-28 | Rejected: slot-map-per-room-day, and booking-document-as-lock. | Hotspot contention; and mixing history with availability. | Fixed (TASK 00B) |
-| AD-07 | **No optimistic UI for booking writes.** | The client cannot know the outcome of a contended transaction. | Fixed |
-| AD-08 | Idempotency via a **stable client-generated `bookingId`** reused across retries; a lock with a matching `bookingId` is success, not conflict. | Retries and double-taps must not create two bookings, and there is no server to deduplicate. | Fixed (revised TASK 00B) |
-| AD-09 | Conflicts surface as a typed `SLOT_TAKEN` and trigger a refetch. | Honest failure beats a silent retry into another slot. | Fixed |
-| AD-17 | **No offline booking queue.** Reads may be cached; writes require connectivity. | A queued write replays against changed lock state and cannot preserve I1. | Fixed |
-
-### Security
-
-| # | Decision | Rationale | Status |
-|---|---|---|---|
-| AD-14 | Security Rules are deny-by-default, mandatory, and tested against the emulator. `allow read, write: if true` is prohibited permanently. | With no trusted compute, rules are the only server-side enforcement. | Fixed (elevated in TASK 00B) |
-| AD-29 | Rules enforce the transaction pattern via `getAfter()` coupling: a lock is invalid without its booking, a booking invalid without its lock; `userId == request.auth.uid` always. | Prevents a hostile client from forging a lock or a booking independently. | Fixed (TASK 00B) |
-| AD-30 | Honest scope: rules cannot distinguish a transaction from a batch. Uniqueness comes from `create` semantics + denied update on an active lock; lost-update protection comes from the transaction read set. | The guarantee must be stated accurately, not overclaimed. | Fixed (TASK 00B) |
-
-### State ownership
-
-| # | Decision | Rationale | Status |
-|---|---|---|---|
-| AD-04 | **TanStack Query is the only cache for server state** (rooms, bookings, slot locks, availability, profile). | Two server-state stores guarantee divergence. | Fixed |
-| AD-05 | **Zustand holds client state only** — filters, UI, session info, draft ids, notification id map, demo mode. Never a Firestore entity. Selectors always, never whole-store subscriptions. | Prevents stale server data being treated as truth, and prevents needless re-renders. | Fixed |
-| AD-06 | **AsyncStorage is client persistence/cache only** — never a source of truth, never decides availability or booking success. Server state wins after reconnect. | Persisted availability would invite guaranteed conflicts. | Fixed |
-| AD-22 | Query-cache persistence is limited to `rooms` and `profile`; `slotLocks`, availability and `bookings` are excluded. | A stale "free" slot after a cold start is worse than a slower cold start. | **Fixed (TASK 00B)** — was open |
-
-### Realtime
-
-| # | Decision | Rationale | Status |
-|---|---|---|---|
-| AD-10 | `onSnapshot()` → TanStack Query cache → UI, behind an abstraction such as `useRoomAvailability()`. No parallel Zustand availability cache. | One server-state owner; push-fed cache with minimum latency. | **Fixed (TASK 00B)** — was open |
-| AD-11 | **Realtime = freshness. Transaction = correctness.** Brief staleness is accepted by design. | A stale grid can only cause a clean conflict, never a double booking. | Fixed |
-| AD-31 | Listeners are scoped, reference-counted, unsubscribed on unmount/blur, never duplicated, never on an unbounded collection or per row. | Memory leaks and Spark quota burn. | Fixed |
-
-### Demo and features
-
-| # | Decision | Rationale | Status |
-|---|---|---|---|
-| AD-16 | **70/30 is traffic/scenario distribution**, paced with `Promise` + `setTimeout` at 1–1.5 s. All outcomes come from real transactions; results are measured, never fabricated or forced. | A faked ratio demonstrates nothing about concurrency. | **Fixed (TASK 00B)** — clarified |
-| AD-24 | **QR is display-only**, payload `bookingId \| roomName \| date \| slotLabel`. No scanner dependency, no check-in backend. | Scope control; the approved stack cannot scan. Reopen only if the lecturer changes the requirement. | **Fixed (TASK 00B)** — was open |
-| AD-23 | Notification ids live in Zustand (`bookingId → notificationId`), persisted to AsyncStorage; cross-device cleanup limitation documented. | Device-local ids are meaningless on another device, and there is no server to schedule from. | **Fixed (TASK 00B)** — was open |
-| AD-26 | **Expo Go is valid** for early development; a development build is introduced later only where native behaviour requires it. Not required in TASK 01. | Avoids premature native complexity. | **Fixed (TASK 00B)** — was open |
-
-### Performance and data
-
-| # | Decision | Rationale | Status |
-|---|---|---|---|
-| AD-12 | Lists over ~30 items use `FlatList` with memoized rows, stable `keyExtractor` and `getItemLayout`. | The 120+ room requirement is a render-churn problem. | Fixed |
-| AD-13 | **Search/filter is in-memory**: Firestore → TanStack Query → 120+ rooms → 300 ms debounce → `useMemo` → `FlatList`. No server-side search, Algolia or Elasticsearch. | At 120 documents the bottleneck is re-render churn, not I/O. | **Fixed (TASK 00B)** — was open |
-| AD-32 | **Room status is derived**, never stored. "Occupied" = a confirmed booking covers now; "Available Now" = none does. Booking-based availability, not sensor occupancy. | A stored flag goes stale the moment a lock changes. | Fixed (TASK 00B) |
-| AD-15 | Pure logic (`buildSlotKey`, `decideBookingOutcome`, `deriveRoomStatus`) lives in `src/utils/`, is framework-free, and is shared between app and tests. | The slot key must have exactly one definition. | Fixed |
-| AD-33 | **Final architecture: flat by-kind `src/` tree** — `components`, `screens`, `navigation`, `store`, `services`, `hooks`, `types`, `data`, `utils`, `providers`. The `app/features/domain/lib/theme` proposal is rejected and removed. Layers: `screens/components → hooks → services → types/data/utils`; Firebase only under `services/`; imports via `@/*`. | A mini-project does not need feature-slicing; by-kind is simpler to navigate, already matches the scaffold, and still expresses the layer boundary that the booking rules depend on. Two parallel architectures were a live contradiction. | **Fixed (TASK 03)** — resolves the TASK 01 discrepancy |
-| AD-34 | Domain types are Firebase-free, live one-per-concern in `src/types/**`, and server-owned entities are fully `readonly`. Ids are plain `string`, not branded. | Keeps the pure layer testable without mocks and prevents accidental mutation of server snapshots; branding is ceremony this scope does not need. | Fixed (TASK 03) |
-| AD-35 | Time slots are a **closed set of exactly four**, with `SlotId` derived from the definition via `as const satisfies`. | An arbitrary user-entered time must be unrepresentable, and slot ids are persisted inside the slot lock key — changing one is a data migration. | Fixed (TASK 03) |
-| AD-20 | Single campus timezone; dates as `yyyy-MM-dd`; slots from a shared definition. | Avoids an entire class of off-by-one-day booking bugs. | Fixed |
-
-### Process
-
-| # | Decision | Rationale | Status |
-|---|---|---|---|
-| AD-18 | Separate dev and production Firebase projects, both on Spark; local work uses the Emulator Suite where appropriate. | Seed and load tests must never touch production. | Fixed (revised TASK 00B) |
-| AD-19 | **Three deployables:** client, Security Rules, Firestore indexes. Deploy rules and indexes **before** the client. | They can be out of step; a rules change is a security change. | Fixed (revised TASK 00B) |
-
-### Superseded decisions
-
-Removed from the architecture in TASK 00B. Listed only so a future session recognises them
-as obsolete if it encounters them in old notes.
-
-| Superseded | Was | Replaced by |
-|---|---|---|
-| ~~AD-02 (original)~~ | Booking writes happen only inside a **Cloud Function** transaction. | AD-02 — client `runTransaction()`. |
-| ~~AD-03 (original)~~ | Clients may **never write** bookings or availability. | AD-03 + AD-29 — clients write, but only in the coupled transaction shape that rules verify. |
-| ~~AD-01 addendum~~ | Cloud Functions are the only privileged compute and the sole writer. | AD-27 — no backend runtime exists. |
-| ~~Blaze plan requirement~~ | Deployment requires a billing-enabled project. | AD-25 — Spark plan, no billing. |
-| ~~`functions/` workspace~~ | A TypeScript Cloud Functions workspace with Admin SDK. | Removed; no equivalent exists. |
-| ~~Cloud Functions deployable~~ | A fourth deployable alongside client, rules and indexes. | AD-19 — three deployables. |
-
----
-
-## Accepted limitations
-
-Recorded in full in `docs/project-brief.md` §Accepted limitations:
-
-1. Notification ids are device-local; cross-device reminder cleanup is deferred to next open.
-2. No offline booking or cancellation — writes require connectivity.
-3. No QR scanning or check-in; the pass is display-only.
-4. Per-user booking quotas are not enforceable in rules without a counter document; out of scope.
-5. Security Rules carry the full enforcement burden — anything inexpressible in rules
-   cannot be enforced at all.
-6. Spark plan quota limits apply and are budgeted in TASK 27, not assumed away.
-
----
-
-## Performance baselines
-
-Recorded in TASK 20 and re-measured in TASK 45. Each entry names the device, OS, build
-type and dataset size — numbers without that context are not comparable.
-
-_(No measurements yet.)_
-
----
-
-## Verification history
-
-Results of the concurrency suite (TASK 44), rules tests (TASK 09 / 30 / 35 / 46), the
-Spark read-budget estimate (TASK 27), and CI runs.
-
-_(No runs yet.)_
+Status: READY FOR REVIEW — verification passed, awaiting user commit.
+Implemented (configuration only — no feature code):
+- `app.config.ts`: dynamic Expo config that receives `app.json` as `config` and adds
+  `extra`. Static metadata stays in `app.json` and is **not** duplicated; this file only
+  reads environment variables and exposes them to the app. Typed with `ExpoConfig` /
+  `ConfigContext`.
+- `.env.example`: declares variable **names** only — `APP_ENV`, `USE_FIREBASE_EMULATOR`,
+  `EMULATOR_HOST`, and the six `FIREBASE_*` web-config keys — with documentation of why
+  the Firebase web config is public and why privileged credentials never appear.
+  No real values committed.
+- `src/types/config.ts`: `AppEnvironment`, `FirebaseConfig`, `AppConfig` — Firebase-SDK-free.
+- `src/utils/parse-config.ts`: pure `parseAppConfig(raw: unknown): AppConfig` plus a
+  `ConfigError` that reports **every** problem at once with a fix hint. No React, Firebase,
+  Expo or I/O, so it is unit-testable with no mocks.
+- `src/services/config.ts`: the infrastructure boundary — the only module that touches
+  `expo-constants`. Validates at module load (app startup) and exports `appConfig`,
+  `isUsingEmulator`, `isDevelopmentEnv`. **No Firebase SDK is imported.**
+- `App.tsx`: imports the config so validation actually runs at startup, and displays the
+  resolved env/emulator flag. No feature logic added.
+- `README.md`: documented that `.env` is required and that startup fails loudly without it.
+- Dependency added: `expo-constants@~57.0.19` — required to read `extra` at runtime, which
+  PLAN.md TASK 04 mandates. No other package added.
+Verification:
+  npm run typecheck                 → PASS (exit 0)
+  npm run lint                      → PASS (exit 0)
+  npm run format:check              → PASS (exit 0)
+  npx expo config --type public     → PASS — resolves name/slug and injects the full
+                                      `extra` payload from `.env`
+  Metro bundle (android)            → PASS — HTTP 200, `Android Bundled 740 modules`,
+                                      log confirms `env: load .env`
+Validator executed directly against the real manifest (transpiled to a scratch dir,
+deleted afterwards), four cases:
+  1. complete config      → parsed; `useFirebaseEmulator` is a real `boolean`, not a string
+  2. two Firebase keys removed → ConfigError naming `FIREBASE_API_KEY` and `FIREBASE_APP_ID`
+  3. empty extra (no .env)     → ConfigError listing all 6 missing keys at once
+  4. `APP_ENV=staging`         → ConfigError "must be one of development | production"
+Commit: not committed — user directed no commit.
+Known issues: `.env` on this machine holds placeholder Firebase values so the app boots;
+TASK 06 must replace them with the real web config. `.env` is gitignored (verified).
+Deviations/notes, all deliberate:
+1. `scheme` was **not** added to the app config. It is deep-linking configuration and
+   PLAN.md TASK 04 does not ask for it; TASK 17 owns it.
+2. `src/services/config.ts` placement: the canonical architecture has no `config/` folder
+   and creating one would change TASK 03's locked structure. `services/` is the
+   infrastructure boundary, so the manifest reader lives there. CLAUDE.md §3 and the brief
+   had their one-line description of `services/` widened from "Firebase / Firestore
+   service layer" to "infrastructure access: Firebase / Firestore, app configuration".
+   No folder was added, renamed or removed.
+Next task: TASK 05

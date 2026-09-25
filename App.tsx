@@ -1,10 +1,15 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { appConfig } from '@/services/config';
+
 import type { JSX } from 'react';
 
 /**
- * Placeholder root component for TASK 01 (scaffold only).
+ * Placeholder root component for the scaffold.
+ *
+ * Importing the config module runs configuration validation at startup, so a
+ * missing or malformed `.env` fails immediately and visibly (TASK 04).
  *
  * Navigation (TASK 16), providers (TASK 11), theming (TASK 05) and every
  * feature screen are intentionally absent — see PLAN.md.
@@ -14,7 +19,9 @@ export default function App(): JSX.Element {
     <View style={styles.container}>
       <Text style={styles.title}>VKU Study Room Booking</Text>
       <Text style={styles.subtitle}>Expo + React Native + TypeScript</Text>
-      <Text style={styles.note}>Scaffold ready — TASK 01</Text>
+      <Text style={styles.note}>
+        env: {appConfig.appEnv} · emulator: {String(appConfig.useFirebaseEmulator)}
+      </Text>
       <StatusBar style="auto" />
     </View>
   );

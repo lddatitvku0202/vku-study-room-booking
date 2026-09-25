@@ -30,10 +30,25 @@ date-fns. Each is added by the task that needs it (see `PLAN.md`).
 npm install
 ```
 
-Copy the environment template (values are added in TASK 04):
+Create your local environment file:
 
 ```bash
 cp .env.example .env
+```
+
+`.env` is gitignored and **required** — the app validates its configuration at
+startup and refuses to boot with a listed explanation if anything is missing or
+malformed, rather than failing later with an `undefined`. Each variable is
+documented in `.env.example`.
+
+The Firebase values are placeholders until the Firebase project is created; the
+Firebase *web* config is public by design and is not a secret. Privileged
+credentials (service-account JSON, private keys) never go in this file.
+
+After changing `.env`, restart with a cache clear:
+
+```bash
+npx expo start --clear
 ```
 
 ## Run

@@ -168,7 +168,8 @@ src/
 ├── screens/      screen-level UI composition
 ├── navigation/   React Navigation config + typed params
 ├── store/        Zustand client state
-├── services/     Firebase / Firestore service layer  ← the only place Firebase is imported
+├── services/     infrastructure access: Firebase / Firestore, app configuration
+│                 ← the only place Firebase is imported
 ├── hooks/        reusable React hooks
 ├── types/        domain + application types (pure)
 ├── data/         static configuration and seed-related local data (pure)
