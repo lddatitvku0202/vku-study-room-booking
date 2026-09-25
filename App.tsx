@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { colors, radius, spacing, typography } from '@/data/theme';
 import { appConfig } from '@/services/config';
 
 import type { JSX } from 'react';
@@ -10,18 +11,22 @@ import type { JSX } from 'react';
  *
  * Importing the config module runs configuration validation at startup, so a
  * missing or malformed `.env` fails immediately and visibly (TASK 04).
+ * Styling comes entirely from the design tokens (TASK 05) — no hard-coded
+ * colours or spacing live here.
  *
- * Navigation (TASK 16), providers (TASK 11), theming (TASK 05) and every
- * feature screen are intentionally absent — see PLAN.md.
+ * Navigation (TASK 16), providers (TASK 11) and every feature screen are
+ * intentionally absent — see PLAN.md.
  */
 export default function App(): JSX.Element {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>VKU Study Room Booking</Text>
-      <Text style={styles.subtitle}>Expo + React Native + TypeScript</Text>
-      <Text style={styles.note}>
-        env: {appConfig.appEnv} · emulator: {String(appConfig.useFirebaseEmulator)}
-      </Text>
+      <View style={styles.card}>
+        <Text style={styles.title}>VKU Study Room Booking</Text>
+        <Text style={styles.subtitle}>Expo + React Native + TypeScript</Text>
+        <Text style={styles.note}>
+          env: {appConfig.appEnv} · emulator: {String(appConfig.useFirebaseEmulator)}
+        </Text>
+      </View>
       <StatusBar style="auto" />
     </View>
   );
@@ -32,25 +37,33 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 24,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+  },
+  card: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: '#101828',
+    ...typography.title,
+    color: colors.text,
     textAlign: 'center',
   },
   subtitle: {
-    marginTop: 8,
-    fontSize: 15,
-    color: '#475467',
+    ...typography.body,
+    marginTop: spacing.sm,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   note: {
-    marginTop: 24,
-    fontSize: 13,
-    color: '#667085',
+    ...typography.caption,
+    marginTop: spacing.lg,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
 });

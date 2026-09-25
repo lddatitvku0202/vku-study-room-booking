@@ -1,7 +1,7 @@
 # PLAN.md — VKU Study Room Booking Development Roadmap
 
 Sequenced roadmap from empty repository to a production-ready build.
-**No application code exists yet.** Phase 0 is planning only.
+Phases 0-1 are under way; see `docs/progress.md` for the authoritative current state.
 
 **Architecture baseline (locked in TASK 00B):** no Cloud Functions, Firebase Spark plan,
 client `runTransaction()` as booking authority, `slotLocks` as the availability lock,
@@ -117,17 +117,34 @@ task works. "It compiles" is never sufficient on its own.
   explicit startup error.
 - **Commit:** `feat(config): add typed environment configuration (TASK 04)`
 
-### TASK 05 — Theme and base UI primitives
-- **Objective:** A consistent visual base so later screens are not ad hoc.
+### TASK 05 — Design tokens
+- **Objective:** One canonical source of visual values, so later screens are not ad hoc.
 - **Dependencies:** TASK 04.
-- **Implementation scope:** design tokens (spacing, color, typography, radii),
-  `SafeAreaProvider` wiring, primitives: `Text`, `Button`, `Card`, `Badge`, `Input`,
-  `Screen`, `EmptyState`, `Skeleton`.
-- **Acceptance criteria:** no hard-coded colors/spacing outside the token file;
-  primitives are memo-friendly (no inline style objects in hot paths); touch targets ≥44pt.
-- **Verification:** a scratch showcase screen renders every primitive in light and dark,
-  on a notched device, with correct insets.
-- **Commit:** `feat(ui): add design tokens and base primitives (TASK 05)`
+- **Implementation scope:** design tokens only — colour, spacing, radius, typography and
+  a minimal `sizes` (touch target) — in `src/data/theme.ts`. Light theme only; **no dark
+  mode, no theme switching, no UI library, no components.** The canonical architecture has
+  no `theme/` folder, so tokens live in `data/` (static configuration, pure).
+- **Acceptance criteria:** no hard-coded colours or spacing anywhere outside the token
+  file; tokens are type-safe and immutable (unknown token names and mutation both fail to
+  compile); the token module imports no React, React Native, Expo or Firebase.
+- **Verification:** `npm run typecheck` and `npm run lint` clean; a throwaway probe proves
+  unknown tokens and mutation are compile errors; grep finds no hex colour outside the
+  token file; the app bundles with tokens applied.
+- **Commit:** `feat(ui): add canonical design tokens (TASK 05)`
+
+### TASK 05B — Base UI primitives
+- **Objective:** Reusable presentational building blocks, so feature screens compose
+  rather than restyle.
+- **Dependencies:** TASK 05.
+- **Implementation scope:** `SafeAreaProvider` wiring at the app root; primitives in
+  `src/components/`: `Text`, `Button`, `Card`, `Badge`, `Input`, `Screen`, `EmptyState`,
+  `Skeleton`. Presentational only — no data fetching, no navigation, no business logic.
+- **Acceptance criteria:** every primitive draws its values from the TASK 05 tokens and
+  hard-codes nothing; primitives are memo-friendly (no inline style objects in hot paths);
+  interactive touch targets are ≥44pt (`sizes.touchTarget`).
+- **Verification:** a scratch showcase screen renders every primitive on a notched device
+  with correct insets; `npm run typecheck` and `npm run lint` clean.
+- **Commit:** `feat(ui): add base ui primitives (TASK 05B)`
 
 ---
 
@@ -287,7 +304,7 @@ task works. "It compiles" is never sufficient on its own.
 
 ### TASK 16 — Navigation skeleton
 - **Objective:** Typed navigation with auth gating.
-- **Dependencies:** TASK 08, TASK 05.
+- **Dependencies:** TASK 08, TASK 05B.
 - **Implementation scope:** React Navigation + gesture-handler/reanimated setup; root
   switch (Auth stack vs App tabs); tabs: Rooms, My Bookings, Profile; native stack for
   Room Detail and Booking Confirmation; fully typed param lists and hooks.
@@ -314,7 +331,7 @@ task works. "It compiles" is never sufficient on its own.
 
 ### TASK 18 — Virtualized room list
 - **Objective:** Smooth scrolling over 120+ rooms.
-- **Dependencies:** TASK 13, TASK 16, TASK 05.
+- **Dependencies:** TASK 13, TASK 16, TASK 05B.
 - **Implementation scope:** `RoomListScreen` with `FlatList`, memoized `RoomCard`, stable
   `keyExtractor`, `getItemLayout` (fixed row height), tuned `windowSize` /
   `maxToRenderPerBatch` / `initialNumToRender`, loading skeletons, empty and error states.
@@ -769,7 +786,7 @@ task works. "It compiles" is never sufficient on its own.
 | Phase | Tasks |
 |---|---|
 | 0 Planning | 00 baseline · **00B decision lock-in** |
-| 1 Foundation | 01 scaffold · 02 strict TS · 03 architecture + domain · 04 config · 05 theme |
+| 1 Foundation | 01 scaffold · 02 strict TS · 03 architecture + domain · 04 config · 05 design tokens · 05B ui primitives |
 | 2 Firebase | 06 wiring · 07 data model (incl. `slotLocks`) · 08 auth · 09 rules v1 · 10 seed 120+ |
 | 3 Server state | 11 Query foundation · 12 repositories · 13 room queries + persistence |
 | 4 Client state | 14 Zustand stores · 15 client persistence |
