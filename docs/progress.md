@@ -482,6 +482,103 @@ Known issues:
   local notifications with default icon and colour.
 Next: MVP-07
 
+## MVP-07 — final submission status
+
+Status: READY FOR REVIEW. Final Emergency MVP step: integration testing, bug fixing,
+demo configuration and README. **No new features.**
+
+> **What this build is:** a local-only demo. Rooms are local mock data read through
+> TanStack Query; bookings live in Zustand + AsyncStorage on the device; the booking
+> conflict is a **LOCAL CONFLICT SIMULATION** (random ~30%). It has **no Firebase, no
+> realtime updates, no server transaction and no multi-device synchronization.**
+
+Bugs fixed in this step:
+- **A fresh clone could not start.** `.env.example` left all six `FIREBASE_*` values
+  empty. The startup config check (TASK 04) rejects empty values, so following the README
+  (`cp .env.example .env`) gave an app that refused to boot with "FIREBASE_API_KEY is
+  missing or empty". The local `.env` had placeholders, which hid the problem. The template
+  now holds obviously fake placeholders (`demo-placeholder…`, not secrets, never used: the
+  MVP does not contact Firebase). The production config check is unchanged.
+- **`npx expo start --tunnel` failed on Windows.** Expo asks to install `@expo/ngrok`, and
+  after a global install it still cannot find it: its lookup checks `<npm prefix>\lib`,
+  but Windows npm uses `<npm prefix>\node_modules`. The workaround (`NODE_PATH` = `npm root
+  -g`) is in the README; nothing in the project changed. `@expo/ngrok@4.1.3` was installed
+  globally on this machine for the tunnel run.
+- README rewritten for the submission. It now states what the app does, how to run it,
+  the performance strategy, the conflict simulation and its limits, with the
+  GitHub / Demo / Video placeholders.
+
+Verified (on this machine, without a phone):
+  npm run typecheck    → PASS (exit 0)
+  npm run lint         → PASS (exit 0)
+  npm run format:check → PASS
+  Integration run of the full flow through the real app modules
+    (only AsyncStorage, expo-notifications, react-native Platform and React's hook functions
+    stand in) → 40/40 PASS:
+    rooms load via QueryClient + `['rooms']` + `fetchRooms()` → 120 (A/B/C/V 30 each, unique
+      ids, capacity 2–20); search "B2" → B201–B206, case-insensitive and trimmed; no-result
+      search and no-result filter → 0; B AND ≥10 AND Projector → 11; Projector AND AC is a
+      strict subset; clear filters → the original array; store clearFilters resets everything;
+      7 dates from today; 4 fixed slots; past from the start minute; every booking attempt
+      waited 1000–1500 ms; 1000 attempts → 69.0% success / 31.0% simulated conflict (a
+      random, not exact, split); double tap → one confirmed booking; QR payload =
+      `bookingId | roomName | date | slotLabel`; booking → permission → reminder at 07:15
+      with the exact Vietnamese title/body, id stored; conflict → slot disabled, alternatives
+      = other free slots and 3 similar rooms; My Bookings counts; cancel → cancelled (kept),
+      notification cancelled, id removed, slot bookable again; not-found / already-cancelled;
+      restart → bookings identical, filters and conflict marks reset, duplicate still
+      rejected; fresh install → empty; `.env.example` config now passes the startup check
+  Navigation types: throwaway probe, 5 valid calls compile (including tab → stack and
+    `popTo('MainTabs', { screen: 'MyBookings' })`); 5 invalid calls (missing, wrong and mistyped
+    params; unknown route; unknown tab) each fail to compile; probe deleted
+  Source review: FlatList with `getItemLayout`, `initialNumToRender` 10,
+    `maxToRenderPerBatch` 10, `windowSize` 7, `removeClippedSubviews`; `React.memo(RoomCard)`;
+    `useDebounce(searchText, 300)`; `useMemo(filterRooms)`; one store selector per field
+  `npx expo start --tunnel` → "Tunnel ready" (https://…-8099.exp.direct). The Android and iOS
+    manifests (HTTP 200, SDK 57) and the full JS bundle (HTTP 200, valid code) downloaded
+    **through the public tunnel URL**. The terminal QR code is not drawn in a
+    non-interactive shell; `npx expo start --tunnel` in a normal terminal shows it.
+
+Not verified — **no physical device or simulator was available in this environment:**
+- Opening the app in Expo Go; the full on-device user flow; back navigation by gesture and
+  button; physical-device scrolling smoothness (no frame rate is claimed).
+- QR rendering on screen and decoding it with a phone scanner app. Only the payload
+  string is verified.
+- Notifications: **"Scheduling API verified; physical delivery not verified."** The calls to
+  `expo-notifications` (permission, DATE trigger at start − 15 min, cancel by id) are verified
+  against a stand-in, not on a phone.
+- Restart persistence on a real device (a simulated restart over the same storage passes).
+- Long room names and different screen sizes: code review only. Every one-line text in list
+  rows is truncated with `numberOfLines={1}`; detail screens wrap. The generated names are
+  at most 17 characters ("Computer Lab V506").
+
+Known limitations:
+- LOCAL CONFLICT SIMULATION: conflicts are random, not caused by another user. It is labelled
+  in the UI ("Demo mode: this conflict was simulated…") and in the README.
+- Device-local data: bookings are not shared between devices or users; uninstalling
+  removes them.
+- Expo Go on Android: reminders are expected to show "not available" (the library fails on
+  import there); real reminders need a development build.
+- Room status "Available Now / Occupied" is a deterministic demo label, not occupancy.
+- Fixed-height room cards may clip text at very large OS font sizes.
+- Room images load from `picsum.photos` (network needed; placeholders otherwise).
+- The production-track "Current state" section below is intentionally unchanged (TASK 05B
+  is next when the Firebase track resumes).
+
+Final acceptance (✅ = verified here · 🔍 = verified by code review · ⚠️ = attempted, not verified):
+  ✅ >=120 rooms · ✅ Search · 🔍 300ms debounce · ✅ Building filter · ✅ Capacity filter ·
+  ✅ Equipment filter · ✅ AND logic · 🔍 useMemo · 🔍 FlatList · 🔍 getItemLayout ·
+  🔍 performance props · 🔍 React.memo · 🔍 Bottom Tabs · 🔍 Native Stack ·
+  ✅ Typed navigation · 🔍 Room Details · ✅ 7 days · ✅ 4 time slots · ✅ Zustand ·
+  ✅ AsyncStorage (stand-in storage) · ✅ Booking · ✅ Loading delay · ✅ 70/30 simulation ·
+  🔍 Conflict Alert · ✅ Slot disabled · ✅ Alternative suggestions · ✅ My Bookings (data) ·
+  ✅ Cancel · ✅ QR payload (rendering ⚠️) · ✅ Local notification scheduling (API only) ·
+  ✅ Notification cancellation (API only) · 🔍 Empty states · 🔍 Error states ·
+  ⚠️ Physical device demo attempt (tunnel up and serving; no device here) ·
+  ✅ npm run typecheck PASS · ✅ npm run lint PASS
+
+Next: none. Emergency MVP complete; no feature work after MVP-07.
+
 ---
 
 ## Current state
