@@ -365,6 +365,123 @@ Known issues:
 - The UI is English except the Vietnamese copy the tasks specify.
 Next: MVP-06
 
+## MVP-06
+
+Status: READY FOR REVIEW
+
+> Still local demo only: no Firebase. The QR pass is **display-only** (no scanner, no
+> check-in). Reminders are **local** notifications scheduled on this device; there is no
+> push service. **Notifications have not been tested on a physical device** — see below.
+
+Implemented:
+- **Dependencies** (via `npx expo install`, `expo install --check` → up to date):
+  `react-native-qrcode-svg@^6.3.26`, `react-native-svg@15.15.4` (its required SVG renderer),
+  `expo-notifications@~57.0.21`. All three are in the approved stack (project brief).
+  **Reanimated not added** (see Animation).
+- **QR booking pass** — `BookingSuccessScreen` shows a success mark, the status, a QR card
+  (`src/components/BookingPass.tsx`) and the booking ID, room, building, date and slot.
+  Payload from the pure `buildBookingPassPayload()` (`src/utils/booking-pass.ts`):
+  `bookingId | roomName | date | slotLabel`, e.g.
+  `demo-abc | Study Room B205 | 2026-09-28 | 07:30 - 09:30`. The payload text is also shown
+  under the QR, so it can be checked by eye. The task's example shows `B205`; the formula says
+  `roomName`, whose value is "Study Room B205", so the formula was followed.
+- **Reminder** — pure rules in `src/utils/booking-reminder.ts`: fires at
+  `startTime − 15 min` on the booking date (local time); title "Nhắc lịch đặt phòng"; body
+  "Sắp đến giờ sử dụng phòng [roomName] lúc [startTime]"; **not scheduled if that time has
+  already passed** (also no permission prompt then). `scheduleBookingReminder()`
+  (`src/hooks/useBookingReminder.ts`) runs when the success screen opens, i.e. only after the
+  booking was saved; it runs once per booking (a remount or a second effect run reuses the
+  first attempt, so nothing is scheduled twice).
+- **Notification id lifecycle** — the id is stored in Zustand as
+  `notificationIds: Record<string, string>` (`bookingId → id`), persisted with the bookings
+  (renamed from MVP-05's always-empty `notificationIdsByBookingId`; old saved data still
+  loads). It is client state only: it says which reminder to cancel, never whether a booking
+  exists. On cancel (MVP-05 flow) the id is removed and the scheduled notification is
+  cancelled. If the booking is cancelled while the permission prompt is still open, the
+  just-scheduled reminder is cancelled and no id is kept.
+- **Permission** — asked only when a reminder is actually needed, and only if not decided
+  yet (no re-prompt after a permanent deny; iOS provisional counts as allowed). Denied → no
+  crash; the success screen says "Notifications are off, so no reminder was set. Your booking
+  is saved." with an **Open Settings** button. On Android the reminder channel is created
+  before the prompt (Android 13+ needs one). A foreground handler shows reminders while the
+  app is open; it is installed at app start (`useNotificationSetup`) without asking.
+- **Expo Go safety** — found while reading the library: in Expo Go on Android,
+  `expo-notifications` **throws when first imported** (its push-token setup; remote push was
+  removed from Expo Go in SDK 53). A normal import would crash the app at startup. The service
+  (`src/services/local-notifications.ts`) loads it with a guarded dynamic `import()`, so that
+  case becomes "Reminders are not available here…" and the booking flow keeps working. Every
+  service function resolves; none throws to the UI.
+- **UI polish** (existing theme tokens only):
+  - `AppButton`: new `danger` variant (used for "Cancel booking"); disabled text stays readable.
+  - Slot states now look different, not only by caption: past = dashed and faded, your
+    booking = thick primary border ("Your booking"), unavailable = red border.
+  - Loading skeletons pulse gently.
+  - `EmptyState` takes an optional icon; message width capped.
+  - Booking card puts date and time first.
+  - Conflict Alert: the required title and message are unchanged; its button
+    "Xem lựa chọn khác" scrolls to the Alternatives section.
+  - Success screen: success mark, QR card, reminder notice, and two actions
+    ("View my bookings", "Back to rooms"). It now shows "Booking cancelled" if the booking was
+    cancelled (fixes an MVP-05 known issue).
+- **Animation** — React Native's built-in `Animated` on the native driver, not Reanimated:
+  a slight press shrink on `AppButton`, one fade-and-rise on the success screen, and the
+  skeleton pulse. All are skipped when the OS "reduce motion" setting is on. **No RoomCard
+  entrance:** rows in a virtualized list remount as you scroll, so an entrance would replay
+  constantly across 120 rooms. Reanimated 4 needs `react-native-worklets` and its Babel
+  plugin, which could not be checked on a device here; the task says to drop the animation
+  rather than risk the MVP, so it was not added.
+
+Verification:
+  npm run typecheck    → PASS (exit 0)
+  npm run lint         → PASS (exit 0, after fixing 16 react-hooks/refs errors:
+                         `useRef(...).current` during render → `useState(() => ...)`)
+  npm run format:check → PASS
+  Real reminder rules, service, store and hooks run in Node. `expo-notifications`,
+  `react-native` and React's hook functions are replaced with scripted stand-ins, so this
+  checks OUR logic against the library's API, not the OS notifications themselves
+  → 43/43 PASS:
+    QR payload: spec example exact; real booking → `id | roomName | date | slotLabel`
+    rules: 07:30 → 07:15; 13:00 → 12:45; 00:10 → previous day 23:55; at 07:14 schedule; at
+      exactly 07:15 or later not scheduled; unreadable date not scheduled; title/body exact
+    granted: DATE trigger at start − 15 min on the reminder channel, content and
+      `data.bookingId` correct, id stored in `notificationIds`, no needless prompt, remount
+      does not schedule twice
+    too late: nothing scheduled, no permission prompt, no id
+    cancel: notification cancelled with the stored id, mapping removed, booking kept
+    permission: undetermined → one prompt → scheduled; channel created before the prompt;
+      user denies → "permission-denied", nothing scheduled, booking unaffected; permanent deny
+      → no re-prompt; iOS provisional allowed
+    failures: module import throws (Expo Go Android) → "unavailable", booking and cancel still
+      work; scheduling throws → "unavailable", no id
+    cancelled during the prompt → reminder cancelled, no id kept
+    restart: bookings (confirmed + cancelled) and ids restored; no second schedule; cancel
+      after restart cancels the stored notification; MVP-05 saved data loads
+  MVP-05 suite re-run on this code → PASS (two assertions updated on purpose: the map is now
+    `notificationIds`, and cancelling now reports "cancelled" because the library is real)
+  Metro bundle → PASS — android and ios HTTP 200; zero `@firebase/` code; lazy (dev) mode:
+    the split-out `expo-notifications` chunk also builds (HTTP 200)
+
+Manual physical-device test — **NOT RUN: no physical device or simulator is available**:
+  1. Successful booking ........................ NOT VERIFIED on device (logic verified above)
+  2. QR visible ................................ NOT VERIFIED
+  3. QR contains correct payload ............... NOT VERIFIED on device (payload builder verified)
+  4. Notification permission prompt ........... NOT VERIFIED
+  5. Reminder scheduled / delivered ............ NOT VERIFIED
+  6. Cancel booking ............................ NOT VERIFIED on device (logic verified above)
+  7. Notification cancellation ................. NOT VERIFIED
+  8. Restart app ............................... NOT VERIFIED on device (simulated restart passes)
+  9. Booking remains ........................... NOT VERIFIED on device (simulated restart passes)
+  10. UI no crash .............................. NOT VERIFIED
+Known issues:
+- **Expo Go on Android:** reminders are expected to show "not available" (see Expo Go
+  safety). Real reminders on Android need a development build. iOS Expo Go should support
+  local notifications — unverified.
+- Reminder timing uses the device's local time zone (same assumption as the slot picker).
+- Tapping a reminder opens the app but not the booking (deep links are production TASK 39).
+- No `expo-notifications` config plugin in `app.config.ts`; not needed for Expo Go or for
+  local notifications with default icon and colour.
+Next: MVP-07
+
 ---
 
 ## Current state

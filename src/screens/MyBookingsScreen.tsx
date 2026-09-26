@@ -111,6 +111,7 @@ export function MyBookingsScreen({ navigation }: MainTabScreenProps<'MyBookings'
           <AppText variant="title">My Bookings</AppText>
         </View>
         <EmptyState
+          icon="📅"
           title="Bạn chưa có lịch đặt phòng"
           message="Rooms you book will appear here."
           actionLabel="Browse rooms"

@@ -33,16 +33,16 @@ export const BookingCard = memo(function BookingCard({ booking, onCancel }: Book
           tone={isConfirmed ? 'success' : 'neutral'}
         />
       </View>
-      <AppText color="textSecondary">Building {booking.building}</AppText>
-      <AppText>
+      <AppText style={styles.when}>
         {booking.date} · {booking.slotLabel}
       </AppText>
+      <AppText color="textSecondary">Building {booking.building}</AppText>
       <AppText variant="caption" color="textSecondary" numberOfLines={1}>
         Booking ID: {booking.id}
       </AppText>
       {isConfirmed && (
         <View style={styles.action}>
-          <AppButton label="Cancel booking" variant="secondary" onPress={handleCancel} />
+          <AppButton label="Cancel booking" variant="danger" onPress={handleCancel} />
         </View>
       )}
     </Card>
@@ -60,6 +60,9 @@ const styles = StyleSheet.create({
   },
   name: {
     flex: 1,
+  },
+  when: {
+    fontWeight: '600',
   },
   action: {
     marginTop: spacing.sm,

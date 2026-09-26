@@ -48,9 +48,14 @@ export function getBookableDates(
   });
 }
 
+/** A `yyyy-MM-dd` date plus an `HH:mm` time as a local Date, or an invalid Date for bad input. */
+export function parseDateTime(dateKey: string, time: string): Date {
+  return parse(`${dateKey} ${time}`, DATE_TIME_FORMAT, REFERENCE_DATE);
+}
+
 /** The moment a slot starts on a given date, or an invalid Date for bad input. */
 export function getSlotStart(dateKey: string, slot: TimeSlot): Date {
-  return parse(`${dateKey} ${slot.start}`, DATE_TIME_FORMAT, REFERENCE_DATE);
+  return parseDateTime(dateKey, slot.start);
 }
 
 /**

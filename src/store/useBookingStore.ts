@@ -43,8 +43,11 @@ export interface BookingStoreState {
   readonly bookings: readonly Booking[];
   readonly filters: RoomFilters;
   readonly conflictedSlotKeys: readonly string[];
-  /** `bookingId → scheduled local notification id`. Device-local. */
-  readonly notificationIdsByBookingId: Readonly<Record<string, string>>;
+  /**
+   * `bookingId → scheduled local notification id`. Device-local client state:
+   * it only says which reminder to cancel, never whether a booking exists.
+   */
+  readonly notificationIds: Readonly<Record<string, string>>;
 
   /** Adds a booking unless its id or its slot is already taken. Atomic in the JS thread. */
   readonly addBooking: (booking: Booking) => AddBookingResult;
@@ -68,7 +71,7 @@ export interface BookingStoreState {
 
 interface PersistedBookingState {
   readonly bookings: readonly Booking[];
-  readonly notificationIdsByBookingId: Readonly<Record<string, string>>;
+  readonly notificationIds: Readonly<Record<string, string>>;
 }
 
 const STORAGE_KEY = 'vku-demo-bookings';
@@ -91,7 +94,7 @@ function readPersistedNotificationIds(persisted: unknown): Readonly<Record<strin
   if (!isRecord(persisted)) {
     return {};
   }
-  const map: unknown = persisted['notificationIdsByBookingId'];
+  const map: unknown = persisted['notificationIds'];
   if (!isRecord(map)) {
     return {};
   }
@@ -127,7 +130,7 @@ export const useBookingStore = create<BookingStoreState>()(
       bookings: [],
       filters: EMPTY_FILTERS,
       conflictedSlotKeys: [],
-      notificationIdsByBookingId: {},
+      notificationIds: {},
 
       addBooking: (booking) => {
         const { bookings } = get();
@@ -142,7 +145,7 @@ export const useBookingStore = create<BookingStoreState>()(
       },
 
       cancelBooking: (bookingId) => {
-        const { bookings, conflictedSlotKeys, notificationIdsByBookingId } = get();
+        const { bookings, conflictedSlotKeys, notificationIds } = get();
         const target = bookings.find((booking) => booking.id === bookingId);
         if (target === undefined) {
           return { kind: 'not-found' };
@@ -152,23 +155,23 @@ export const useBookingStore = create<BookingStoreState>()(
         }
         const cancelled: Booking = { ...target, status: 'cancelled' };
         const slotKey = getBookingSlotKey(target);
-        const notificationId = notificationIdsByBookingId[bookingId];
+        const notificationId = notificationIds[bookingId];
         const remainingNotificationIds = Object.fromEntries(
-          Object.entries(notificationIdsByBookingId).filter(([id]) => id !== bookingId),
+          Object.entries(notificationIds).filter(([id]) => id !== bookingId),
         );
         // One update: history kept, slot freed, conflict mark and reminder id dropped.
         set({
           bookings: bookings.map((booking) => (booking.id === bookingId ? cancelled : booking)),
           conflictedSlotKeys: conflictedSlotKeys.filter((key) => key !== slotKey),
-          notificationIdsByBookingId: remainingNotificationIds,
+          notificationIds: remainingNotificationIds,
         });
         return { kind: 'cancelled', booking: cancelled, notificationId };
       },
 
       setBookingNotificationId: (bookingId, notificationId) => {
         set((state) => ({
-          notificationIdsByBookingId: {
-            ...state.notificationIdsByBookingId,
+          notificationIds: {
+            ...state.notificationIds,
             [bookingId]: notificationId,
           },
         }));
@@ -233,15 +236,17 @@ export const useBookingStore = create<BookingStoreState>()(
       storage: createJSONStorage<PersistedBookingState>(() => AsyncStorage),
       partialize: (state): PersistedBookingState => ({
         bookings: state.bookings,
-        notificationIdsByBookingId: state.notificationIdsByBookingId,
+        notificationIds: state.notificationIds,
       }),
       // Still version 1: the id map is an optional addition, and data saved before
       // it existed loads with an empty map. A version bump would discard saved
-      // bookings, because no migration is defined.
+      // bookings, because no migration is defined. (MVP-05 saved the map as
+      // `notificationIdsByBookingId`; it was always empty, as nothing was
+      // scheduled then, so it is simply ignored.)
       merge: (persisted, current) => ({
         ...current,
         bookings: readPersistedBookings(persisted),
-        notificationIdsByBookingId: readPersistedNotificationIds(persisted),
+        notificationIds: readPersistedNotificationIds(persisted),
       }),
       // The returned callback runs after hydration finishes *or fails*.
       // Parameters stay contextually typed so they don't disturb store inference.

@@ -51,6 +51,7 @@ interface ConflictContext {
 
 const CONFLICT_TITLE = 'Đặt phòng không thành công';
 const CONFLICT_MESSAGE = 'Rất tiếc, phòng này vừa được người khác đặt thành công.';
+const CONFLICT_ACTION = 'Xem lựa chọn khác';
 
 // The native header already pads the top; the bottom inset belongs to the action bar.
 const SCREEN_EDGES = ['left', 'right', 'bottom'] as const;
@@ -99,6 +100,7 @@ export function RoomDetailsScreen({
   const [conflict, setConflict] = useState<ConflictContext | null>(null);
   // Synchronous guard: blocks a second tap before the disabled state re-renders.
   const inFlightRef = useRef(false);
+  const slotListRef = useRef<FlatList<SlotItem>>(null);
 
   const bookedKeys = useMemo(() => getConfirmedSlotKeys(bookings), [bookings]);
   const conflictedKeys = useMemo(() => new Set(conflictedSlotKeys), [conflictedSlotKeys]);
@@ -197,7 +199,15 @@ export function RoomDetailsScreen({
         markSlotConflict(result.slotKey);
         setSelectedSlotId(null);
         setConflict({ date, slotId: slot.id });
-        Alert.alert(CONFLICT_TITLE, CONFLICT_MESSAGE);
+        Alert.alert(CONFLICT_TITLE, CONFLICT_MESSAGE, [
+          {
+            text: CONFLICT_ACTION,
+            onPress: () => {
+              // The Alternatives section is the list footer.
+              slotListRef.current?.scrollToEnd({ animated: true });
+            },
+          },
+        ]);
         return;
       }
 
@@ -400,6 +410,7 @@ export function RoomDetailsScreen({
   return (
     <Screen edges={SCREEN_EDGES}>
       <FlatList
+        ref={slotListRef}
         data={slotItems}
         renderItem={renderSlot}
         keyExtractor={slotKeyOf}

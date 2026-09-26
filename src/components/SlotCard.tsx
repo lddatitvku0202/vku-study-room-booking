@@ -20,7 +20,7 @@ const STATE_CAPTION: Readonly<Record<SlotCardState, string>> = {
   available: 'Available',
   selected: 'Selected',
   past: 'Past',
-  booked: 'Booked',
+  booked: 'Your booking',
   conflicted: 'Unavailable',
 };
 
@@ -30,6 +30,14 @@ const CAPTION_COLOR: Readonly<Record<SlotCardState, ColorToken>> = {
   past: 'disabled',
   booked: 'primary',
   conflicted: 'error',
+};
+
+const LABEL_COLOR: Readonly<Record<SlotCardState, ColorToken>> = {
+  available: 'text',
+  selected: 'surface',
+  past: 'disabled',
+  booked: 'primary',
+  conflicted: 'textSecondary',
 };
 
 const DISABLED_STATES: ReadonlySet<SlotCardState> = new Set(['past', 'booked', 'conflicted']);
@@ -59,15 +67,13 @@ export const SlotCard = memo(function SlotCard({ slotId, label, state, onSelect 
       style={({ pressed }) => [
         styles.card,
         isSelected && styles.selected,
-        isDisabled && styles.disabled,
+        state === 'past' && styles.past,
+        state === 'booked' && styles.booked,
+        state === 'conflicted' && styles.conflicted,
         pressed && !isSelected && styles.pressed,
       ]}
     >
-      <AppText
-        variant="heading"
-        color={isSelected ? 'surface' : isDisabled ? 'disabled' : 'text'}
-        numberOfLines={1}
-      >
+      <AppText variant="heading" color={LABEL_COLOR[state]} numberOfLines={1}>
         {label}
       </AppText>
       <AppText variant="caption" color={CAPTION_COLOR[state]} style={styles.caption}>
@@ -93,8 +99,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  disabled: {
+  // Each unavailable state reads differently at a glance, not only by its caption.
+  past: {
     backgroundColor: colors.background,
+    borderStyle: 'dashed',
+    opacity: 0.7,
+  },
+  booked: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  conflicted: {
+    backgroundColor: colors.background,
+    borderColor: colors.error,
   },
   pressed: {
     backgroundColor: colors.background,

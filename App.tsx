@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '@/services/config';
 
 import { colors } from '@/data/theme';
+import { useNotificationSetup } from '@/hooks/useNotificationSetup';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { QueryProvider } from '@/providers/QueryProvider';
 
@@ -33,6 +34,8 @@ const navigationTheme: Theme = {
  * then navigation. EMERGENCY MVP — see docs/progress.md.
  */
 export default function App(): JSX.Element {
+  useNotificationSetup();
+
   return (
     <SafeAreaProvider>
       <QueryProvider>
