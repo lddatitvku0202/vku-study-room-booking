@@ -1,8 +1,8 @@
 /**
  * Local demo booking store — EMERGENCY MVP.
  *
- * Holds the demo bookings, the room filters, and the slots marked conflicted by
- * the demo simulator. Components read it through narrow selectors, never by
+ * Holds the demo bookings, the room filters, the slots marked conflicted by the
+ * demo simulator, and the local notification id of each booking's reminder. Components read it through narrow selectors, never by
  * subscribing to the whole store.
  *
  * MVP exception, on purpose: in the production design bookings are server state
@@ -10,8 +10,9 @@
  * no server, so these demo bookings are local records persisted with AsyncStorage.
  * They are device-local and are NOT synchronized between users.
  *
- * Persistence: only `bookings` is saved. Filters and conflict marks reset on
- * restart, so a random demo conflict can never leave a slot blocked for good.
+ * Persistence: only `bookings` and the notification id map are saved. Filters and
+ * conflict marks reset on restart, so a random demo conflict can never leave a
+ * slot blocked for good.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,15 +29,33 @@ import type { Building, Equipment } from '@/types/room';
 
 export type AddBookingResult = 'added' | 'duplicate';
 
+export type CancelBookingResult =
+  | {
+      readonly kind: 'cancelled';
+      readonly booking: Booking;
+      /** Id of the reminder scheduled for this booking, if one was recorded. */
+      readonly notificationId: string | undefined;
+    }
+  | { readonly kind: 'not-found' }
+  | { readonly kind: 'already-cancelled' };
+
 export interface BookingStoreState {
   readonly bookings: readonly Booking[];
   readonly filters: RoomFilters;
   readonly conflictedSlotKeys: readonly string[];
+  /** `bookingId → scheduled local notification id`. Device-local. */
+  readonly notificationIdsByBookingId: Readonly<Record<string, string>>;
 
   /** Adds a booking unless its id or its slot is already taken. Atomic in the JS thread. */
   readonly addBooking: (booking: Booking) => AddBookingResult;
-  /** Marks a confirmed booking cancelled, which frees its slot. */
-  readonly cancelBooking: (bookingId: string) => void;
+  /**
+   * Marks a confirmed booking cancelled and keeps it as history. Frees its slot,
+   * clears any conflict mark on that slot, and removes (and returns) its
+   * notification id so the caller can cancel the scheduled reminder.
+   */
+  readonly cancelBooking: (bookingId: string) => CancelBookingResult;
+  /** Records the reminder scheduled for a booking. */
+  readonly setBookingNotificationId: (bookingId: string, notificationId: string) => void;
   readonly markSlotConflict: (slotKey: string) => void;
   readonly clearConflict: (slotKey: string) => void;
 
@@ -49,6 +68,7 @@ export interface BookingStoreState {
 
 interface PersistedBookingState {
   readonly bookings: readonly Booking[];
+  readonly notificationIdsByBookingId: Readonly<Record<string, string>>;
 }
 
 const STORAGE_KEY = 'vku-demo-bookings';
@@ -64,6 +84,24 @@ function readPersistedBookings(persisted: unknown): readonly Booking[] {
   }
   const list: unknown = persisted['bookings'];
   return Array.isArray(list) ? list.filter((item: unknown) => isBooking(item)) : [];
+}
+
+/** Validates the saved notification id map; non-string entries are dropped. */
+function readPersistedNotificationIds(persisted: unknown): Readonly<Record<string, string>> {
+  if (!isRecord(persisted)) {
+    return {};
+  }
+  const map: unknown = persisted['notificationIdsByBookingId'];
+  if (!isRecord(map)) {
+    return {};
+  }
+  const valid: Record<string, string> = {};
+  for (const [bookingId, notificationId] of Object.entries(map)) {
+    if (typeof notificationId === 'string') {
+      valid[bookingId] = notificationId;
+    }
+  }
+  return valid;
 }
 
 // Hydration status is tracked here rather than read from persist.hasHydrated():
@@ -89,6 +127,7 @@ export const useBookingStore = create<BookingStoreState>()(
       bookings: [],
       filters: EMPTY_FILTERS,
       conflictedSlotKeys: [],
+      notificationIdsByBookingId: {},
 
       addBooking: (booking) => {
         const { bookings } = get();
@@ -103,12 +142,35 @@ export const useBookingStore = create<BookingStoreState>()(
       },
 
       cancelBooking: (bookingId) => {
+        const { bookings, conflictedSlotKeys, notificationIdsByBookingId } = get();
+        const target = bookings.find((booking) => booking.id === bookingId);
+        if (target === undefined) {
+          return { kind: 'not-found' };
+        }
+        if (target.status === 'cancelled') {
+          return { kind: 'already-cancelled' };
+        }
+        const cancelled: Booking = { ...target, status: 'cancelled' };
+        const slotKey = getBookingSlotKey(target);
+        const notificationId = notificationIdsByBookingId[bookingId];
+        const remainingNotificationIds = Object.fromEntries(
+          Object.entries(notificationIdsByBookingId).filter(([id]) => id !== bookingId),
+        );
+        // One update: history kept, slot freed, conflict mark and reminder id dropped.
+        set({
+          bookings: bookings.map((booking) => (booking.id === bookingId ? cancelled : booking)),
+          conflictedSlotKeys: conflictedSlotKeys.filter((key) => key !== slotKey),
+          notificationIdsByBookingId: remainingNotificationIds,
+        });
+        return { kind: 'cancelled', booking: cancelled, notificationId };
+      },
+
+      setBookingNotificationId: (bookingId, notificationId) => {
         set((state) => ({
-          bookings: state.bookings.map((booking): Booking =>
-            booking.id === bookingId && booking.status === 'confirmed'
-              ? { ...booking, status: 'cancelled' }
-              : booking,
-          ),
+          notificationIdsByBookingId: {
+            ...state.notificationIdsByBookingId,
+            [bookingId]: notificationId,
+          },
         }));
       },
 
@@ -169,8 +231,18 @@ export const useBookingStore = create<BookingStoreState>()(
       name: STORAGE_KEY,
       version: 1,
       storage: createJSONStorage<PersistedBookingState>(() => AsyncStorage),
-      partialize: (state): PersistedBookingState => ({ bookings: state.bookings }),
-      merge: (persisted, current) => ({ ...current, bookings: readPersistedBookings(persisted) }),
+      partialize: (state): PersistedBookingState => ({
+        bookings: state.bookings,
+        notificationIdsByBookingId: state.notificationIdsByBookingId,
+      }),
+      // Still version 1: the id map is an optional addition, and data saved before
+      // it existed loads with an empty map. A version bump would discard saved
+      // bookings, because no migration is defined.
+      merge: (persisted, current) => ({
+        ...current,
+        bookings: readPersistedBookings(persisted),
+        notificationIdsByBookingId: readPersistedNotificationIds(persisted),
+      }),
       // The returned callback runs after hydration finishes *or fails*.
       // Parameters stay contextually typed so they don't disturb store inference.
       onRehydrateStorage: () => (_state, error) => {

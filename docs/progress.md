@@ -292,6 +292,79 @@ Known issues:
 Commit: `feat(mvp): add local booking and conflict simulation`
 Next: MVP-05
 
+## MVP-05
+
+Status: READY FOR REVIEW
+
+> Still **local demo only**: no Firebase. Cancelling changes the booking saved on this
+> device; nothing is sent anywhere and no other user is affected.
+
+Implemented:
+- **My Bookings** (`src/screens/MyBookingsScreen.tsx`) — a `FlatList` of the saved demo
+  bookings, read with the selector `useBookingStore((state) => state.bookings)` (no
+  whole-store subscription). Each row (`src/components/BookingCard.tsx`, memoized) shows
+  room, building, date, time slot, booking ID and a status badge. Stable `keyExtractor`,
+  memoized `renderItem`, item separator component.
+- **Status filter** — "Confirmed (n)" / "Cancelled (n)" chips, Confirmed selected by
+  default; each list sorted by date, then start time (`src/utils/booking-list.ts`, pure).
+  Only confirmed bookings show a **Cancel booking** button; cancelled ones show none.
+- **States** — while saved bookings load: spinner + "Loading your bookings…"; no bookings
+  at all: "Bạn chưa có lịch đặt phòng" with a "Browse rooms" action; an empty filter:
+  "No confirmed bookings" / "No cancelled bookings".
+- **Cancel** — the button opens a confirmation `Alert` ("Cancel this booking?", room, date
+  and slot; "Keep booking" / "Cancel booking"). On confirm, `useCancelBooking()`
+  (`src/hooks/useCancelBooking.ts`) calls the store's `cancelBooking`, which in **one
+  update**: sets `status: 'cancelled'` (the booking is **kept as history**, never deleted),
+  frees the slot (a slot is taken only by a *confirmed* booking, so Room Details shows it
+  available again), removes the conflict mark for that slot, and removes the booking's
+  notification id. It returns a typed result: `cancelled` (with the notification id, if
+  any) / `already-cancelled` / `not-found`.
+- **Notification cancellation hook** — the store now keeps `notificationIdsByBookingId`
+  (`bookingId → notification id`; allowed in Zustand by CLAUDE.md §5) and persists it. If
+  a cancelled booking had an id, the hook calls `cancelScheduledNotification()` in
+  `src/services/local-notifications.ts`. **No notification library is installed**
+  (`expo-notifications` is production TASK 38/39), so nothing is scheduled yet, the map is
+  always empty in the app, and the service honestly returns `'unavailable'` instead of
+  claiming a cancellation. When reminders are added, only that service file changes.
+- **Persistence** — still version 1. Data saved by MVP-04 (no id map) loads with its
+  bookings and an empty map; a version bump would have discarded saved bookings, since
+  zustand drops state that has no migration. Malformed map entries are dropped on load.
+- No swipe gesture (explicit button only, per the task).
+
+Verification:
+  npm run typecheck    → PASS (exit 0)
+  npm run lint         → PASS (exit 0)
+  npm run format:check → PASS (exit 0, after one Prettier fix)
+  Real store + real `useCancelBooking` hook run in Node (only AsyncStorage and React's hook
+  functions replaced by stand-ins) → 25/25 PASS:
+    1–2 a new booking appears in the Confirmed list with status confirmed; sorted by date
+        and time; counts 3 / 0
+    4   cancel → status cancelled; typed result carries the notification id
+    5   booking kept as history: still 3 bookings, now in the Cancelled list, counts 2 / 1
+    6   slot freed (no longer a booked key); a new booking on the same slot → added;
+        that slot's conflict mark removed, other conflict marks kept
+        notification: id present → cancel requested once with that id, id removed from the
+        map, other bookings' ids kept; no id → no call; service returns 'unavailable'
+        cancel twice → 'already-cancelled', unknown id → 'not-found', nothing changes
+    7   simulated restart: bookings identical, cancelled still cancelled, id map restored,
+        freed slot still bookable; MVP-04-format data loads; malformed map entries dropped
+  MVP-04 suite re-run on the new store → 31/32; the one failure is its old assertion
+    "only `bookings` is persisted", now intentionally `bookings` + the id map
+  Metro bundle → PASS — android and ios HTTP 200; zero `@firebase/` code
+  8   FlatList used — yes (code review)
+Known issues:
+- **Not run on a device** (no device or simulator here): test 3 (the confirmation Alert
+  appearing) and the visual checks are code-reviewed only; the logic behind every other
+  step is verified above.
+- A confirmed booking whose time has already passed can still be cancelled; that frees a
+  past slot, which stays disabled anyway.
+- Booking cards are not fixed-height, so the list has no `getItemLayout`. A student's
+  bookings are a short list, and fixed heights would clip text at large font sizes.
+- `BookingSuccessScreen` still shows a fixed "Confirmed" badge; it is only reached right
+  after booking, before any cancel is possible.
+- The UI is English except the Vietnamese copy the tasks specify.
+Next: MVP-06
+
 ---
 
 ## Current state
