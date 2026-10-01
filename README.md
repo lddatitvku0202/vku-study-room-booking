@@ -1,18 +1,24 @@
-# VKU Study Room Booking — Emergency Submission MVP
+# VKU Study Room Booking — Local Submission MVP
 
 VKU Mini-Project 2. A React Native (Expo) + TypeScript app for VKU students to find a
 study room or computer lab and book a `(room, date, time slot)`.
 
 - GitHub: [YOUR GITHUB URL]
-- Demo: [EXPO GO / DEMO INFORMATION]
+- Demo: runs in **Expo Go** (`npx expo start --tunnel`, then scan the QR code; see
+  [How to run](#how-to-run)). Tested on a physical phone in Expo Go on 2026-10-01: PASS.
 - Video: [VIDEO URL]
 
-> **Important limitation.** This emergency submission build uses **local mock data** and a
-> **local conflict simulation**. It has no backend: no Firebase, no server transaction, no
-> realtime updates, and no synchronization between devices or users. Bookings are stored
-> on the device only. The production Firebase architecture (Auth + Firestore
-> `runTransaction()` + Security Rules) remains planned in `PLAN.md` but is **not part of
-> this build**.
+> **This is a Local Submission MVP.** It runs entirely on the phone:
+>
+> - **local mock room data** (120 generated rooms, read through TanStack Query)
+> - **local Zustand state** for bookings, filters and reminders
+> - **AsyncStorage persistence** so bookings survive a restart
+> - a **local conflict simulation** (a random ~30% of booking attempts fail)
+>
+> It has no backend: no Firebase, no server transaction, no realtime updates, and no
+> synchronization between devices or users. The production Firebase architecture (Auth +
+> Firestore `runTransaction()` + Security Rules) remains planned in `PLAN.md` but is
+> **not part of this build**.
 
 ## Problem
 
@@ -148,11 +154,21 @@ build**.
 - **In Expo Go on Android, reminders show as "not available".** `expo-notifications` fails
   there when loaded, because remote push was removed from Expo Go in SDK 53. The app
   handles this and keeps working. Real reminders on Android need a development build.
-- Reminder delivery has not been checked on a physical device.
+- Reminders: scheduling API verified; physical delivery not verified.
 - Tapping a reminder opens the app but not the specific booking.
 - Times use the phone's local time zone.
 - Room images are placeholders from `picsum.photos` and need an internet connection.
 - The UI is mostly English, with the Vietnamese texts required by the assignment.
+
+## Verification
+
+- **Physical device, Expo Go (2026-10-01): PASS.** Tested: browsing 120+ rooms; search and
+  combined filters; Room Details with the 7 days and 4 slots; booking with the loading
+  state; the simulated conflict (alert, disabled slot, alternatives); the success screen
+  and QR; My Bookings and cancellation; persistence after a restart; navigation.
+- **Notifications:** scheduling API verified; physical delivery not verified.
+- **Code checks:** `npm run typecheck` and `npm run lint` pass. A 40-check integration run
+  covers the same flow in Node (see `docs/progress.md`, MVP-07).
 
 ## Documentation
 

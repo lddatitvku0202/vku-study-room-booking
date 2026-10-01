@@ -72,8 +72,7 @@ Verification:
   Metro bundle → PASS — android and ios HTTP 200 (813 modules); screen, TanStack Query and
     SafeAreaProvider present; zero `@firebase/` code in the bundle
 Known issues:
-- **On-device launch not verified** — no device or simulator in this environment. Bundling
-  both platforms is the proxy that was run; confirm with `npx expo start` + Expo Go.
+- On-device launch: **verified** on a physical phone in Expo Go on 2026-10-01 (see "Physical-device verification" below).
 - Room images are remote (`picsum.photos`) and need internet; offline, each card shows its
   grey placeholder instead.
 - Fixed-height cards clamp text to one line. At very large accessibility font sizes, text is
@@ -131,10 +130,9 @@ Verification:
     10 / 10 / 7, `removeClippedSubviews`); RoomCard still `React.memo`; no ScrollView; no `any`
   Metro bundle → PASS — android and ios HTTP 200 (817 modules)
 Known issues:
-- **Debounce timing and scroll smoothness not verified on a device** — no device or
-  simulator here, and no React test renderer is installed (a test framework is TASK 43).
-  The hook is the standard clear-and-restart pattern; on device, typing fast should show
-  "Searching…" and update the list once, about 300 ms after the last keystroke.
+- Search, filters and the 120-room list: **verified** on a physical phone in Expo Go on
+  2026-10-01 (see "Physical-device verification" below). The exact 300 ms timing and the frame rate were not measured with
+  a profiler; no frame rate is claimed.
 - Equipment uses "must have all selected". PLAN.md TASK 22 (production) describes OR within
   a dimension; the MVP follows this task's "search + all filters: AND logic".
 - The fixed header (title, search, three chip rows, summary) takes about 300pt, so small
@@ -195,9 +193,8 @@ Verification:
     to `BookingSuccess`, empty params
   Metro bundle → PASS — android and ios HTTP 200 (1379 modules)
 Known issues:
-- **Manual navigation checks not run on a device** (open browse, tap card, back, 7 dates,
-  4 slots, past slots disabled, button enabling) — no device or simulator here. Logic and
-  types behind each check are verified above.
+- Navigation, Room Details, the 7-day selector and the 4 slots: **verified** on a physical
+  phone in Expo Go on 2026-10-01 (see "Physical-device verification" below).
 - Tabs are label-only because no icon library is installed (the task limits dependencies).
 - The UI is English except the Vietnamese copy this task specifies ("Đặt phòng"); pick one
   language before submission.
@@ -284,9 +281,8 @@ Known issues:
   disabled forever ("Loading your saved bookings…"). Hydration is now tracked through
   `onRehydrateStorage`, which settles on failure too; the store starts empty and booking
   works (3 added checks cover this).
-- **Manual on-device steps not run** (spinner visible, alert shown, disabled slot, restart
-  persistence on a real device) — no device or simulator here. The logic behind every
-  step is verified above.
+- Spinner, conflict alert, disabled slot, alternatives and restart persistence: **verified**
+  on a physical phone in Expo Go on 2026-10-01 (see "Physical-device verification" below).
 - Demo bookings are device-local: reinstalling the app or clearing its data removes them.
 - The UI is English except the Vietnamese copy this task specifies.
 Commit: `feat(mvp): add local booking and conflict simulation`
@@ -353,9 +349,8 @@ Verification:
   Metro bundle → PASS — android and ios HTTP 200; zero `@firebase/` code
   8   FlatList used — yes (code review)
 Known issues:
-- **Not run on a device** (no device or simulator here): test 3 (the confirmation Alert
-  appearing) and the visual checks are code-reviewed only; the logic behind every other
-  step is verified above.
+- My Bookings and cancellation: **verified** on a physical phone in Expo Go on 2026-10-01
+  (see "Physical-device verification" below).
 - A confirmed booking whose time has already passed can still be cancelled; that frees a
   past slot, which stays disabled anyway.
 - Booking cards are not fixed-height, so the list has no `getItemLayout`. A student's
@@ -371,7 +366,8 @@ Status: READY FOR REVIEW
 
 > Still local demo only: no Firebase. The QR pass is **display-only** (no scanner, no
 > check-in). Reminders are **local** notifications scheduled on this device; there is no
-> push service. **Notifications have not been tested on a physical device** — see below.
+> push service. The screens were verified on a physical phone on 2026-10-01; **notification
+> delivery has not been observed on a device** (see "Physical-device verification" below).
 
 Implemented:
 - **Dependencies** (via `npx expo install`, `expo install --check` → up to date):
@@ -461,17 +457,19 @@ Verification:
   Metro bundle → PASS — android and ios HTTP 200; zero `@firebase/` code; lazy (dev) mode:
     the split-out `expo-notifications` chunk also builds (HTTP 200)
 
-Manual physical-device test — **NOT RUN: no physical device or simulator is available**:
-  1. Successful booking ........................ NOT VERIFIED on device (logic verified above)
-  2. QR visible ................................ NOT VERIFIED
-  3. QR contains correct payload ............... NOT VERIFIED on device (payload builder verified)
-  4. Notification permission prompt ........... NOT VERIFIED
-  5. Reminder scheduled / delivered ............ NOT VERIFIED
-  6. Cancel booking ............................ NOT VERIFIED on device (logic verified above)
-  7. Notification cancellation ................. NOT VERIFIED
-  8. Restart app ............................... NOT VERIFIED on device (simulated restart passes)
-  9. Booking remains ........................... NOT VERIFIED on device (simulated restart passes)
-  10. UI no crash .............................. NOT VERIFIED
+Manual physical-device test (Expo Go, 2026-10-01 — see "Physical-device verification" below):
+  1. Successful booking ........................ PASS
+  2. QR visible ................................ PASS
+  3. QR contains correct payload ............... payload builder verified in Node; on device
+                                                 the QR works (decoding not separately recorded)
+  4. Notification permission prompt ........... not reported
+  5. Reminder scheduled / delivered ............ scheduling API verified; physical delivery
+                                                 NOT VERIFIED
+  6. Cancel booking ............................ PASS
+  7. Notification cancellation ................. API verified; not observed on device
+  8. Restart app ............................... PASS
+  9. Booking remains ........................... PASS
+  10. UI no crash .............................. PASS (no crash reported)
 Known issues:
 - **Expo Go on Android:** reminders are expected to show "not available" (see Expo Go
   safety). Real reminders on Android need a development build. iOS Expo Go should support
@@ -539,15 +537,14 @@ Verified (on this machine, without a phone):
     **through the public tunnel URL**. The terminal QR code is not drawn in a
     non-interactive shell; `npx expo start --tunnel` in a normal terminal shows it.
 
-Not verified — **no physical device or simulator was available in this environment:**
-- Opening the app in Expo Go; the full on-device user flow; back navigation by gesture and
-  button; physical-device scrolling smoothness (no frame rate is claimed).
-- QR rendering on screen and decoding it with a phone scanner app. Only the payload
-  string is verified.
+Verified on a physical device (after this entry was written): the full user flow in Expo
+Go — see "Physical-device verification" below.
+
+Still not verified:
 - Notifications: **"Scheduling API verified; physical delivery not verified."** The calls to
   `expo-notifications` (permission, DATE trigger at start − 15 min, cancel by id) are verified
-  against a stand-in, not on a phone.
-- Restart persistence on a real device (a simulated restart over the same storage passes).
+  against a stand-in; delivery on a phone was not observed.
+- Scrolling frame rate (not measured; no frame rate is claimed).
 - Long room names and different screen sizes: code review only. Every one-line text in list
   rows is truncated with `numberOfLines={1}`; detail screens wrap. The generated names are
   at most 17 characters ("Computer Lab V506").
@@ -565,7 +562,9 @@ Known limitations:
 - The production-track "Current state" section below is intentionally unchanged (TASK 05B
   is next when the Firebase track resumes).
 
-Final acceptance (✅ = verified here · 🔍 = verified by code review · ⚠️ = attempted, not verified):
+Final acceptance at the time of MVP-07 (✅ = verified here · 🔍 = verified by code review ·
+⚠️ = attempted, not verified). The 🔍 and ⚠️ screen items were later verified on a physical
+device; see "Physical-device verification" below for the final status:
   ✅ >=120 rooms · ✅ Search · 🔍 300ms debounce · ✅ Building filter · ✅ Capacity filter ·
   ✅ Equipment filter · ✅ AND logic · 🔍 useMemo · 🔍 FlatList · 🔍 getItemLayout ·
   🔍 performance props · 🔍 React.memo · 🔍 Bottom Tabs · 🔍 Native Stack ·
@@ -578,6 +577,42 @@ Final acceptance (✅ = verified here · 🔍 = verified by code review · ⚠�
   ✅ npm run typecheck PASS · ✅ npm run lint PASS
 
 Next: none. Emergency MVP complete; no feature work after MVP-07.
+
+## Physical-device verification — PASS
+
+Date: 2026-10-01. Tested by the project owner on a **physical phone in Expo Go** (build at
+commit `a73e120`). Result: **PASS**.
+
+Build under test: **Local Submission MVP**, with local mock room data, local Zustand state,
+AsyncStorage persistence and a LOCAL CONFLICT SIMULATION. It has no Firebase, no realtime
+updates, no server transaction and no multi-device synchronization, so none of those were
+tested or are claimed.
+
+Observed on the device — all PASS:
+- App opens in Expo Go; Home (Browse Rooms) works; 120+ rooms are listed.
+- Search works; building, capacity and equipment filters work; combined (AND) filtering works.
+- Room Details, the 7-day date selector and the 4 fixed time slots work.
+- Booking flow works, with the 1–1.5 s loading state.
+- LOCAL CONFLICT SIMULATION works: the conflict Alert appears, the conflicting slot becomes
+  disabled, and alternative slots are offered.
+- Booking Success and the QR code work.
+- My Bookings and cancellation work.
+- Bookings persist after an app restart (AsyncStorage).
+- Navigation works (tabs and stack).
+
+Notifications: **"Scheduling API verified; physical delivery not verified."**
+- The scheduling and cancellation calls are verified in Node against a stand-in for
+  `expo-notifications` (MVP-06, MVP-07).
+- The device test above does not cover the permission prompt, a reminder being scheduled
+  on the phone, or a reminder arriving. They remain unverified on a device.
+- In Expo Go on Android, reminders are expected to report "not available" (see MVP-06).
+
+Not measured: scrolling frame rate (no frame rate is claimed) and the exact debounce timing
+on the device.
+
+Final MVP status: **complete.** Code checks pass (typecheck, lint), the 40-check
+integration run passes, and the physical Expo Go test passes. Open item:
+notification delivery on a device.
 
 ---
 
@@ -697,6 +732,9 @@ the compiled bundle. `git check-ignore` / `git add -n` confirm `.env` is refused
 Not verified: on-device rendering in Expo Go — no physical device or emulator was
 available in this environment. Bundling for both platforms is the closest proxy that was
 actually run; the user should confirm on a device.
+Update 2026-10-01: the app (Emergency MVP build) has since been opened and tested on a
+physical phone in Expo Go — PASS; see "Physical-device verification" in the Emergency MVP
+section.
 Commit: not committed — user directed no commit; they will review and commit.
 Known issues: the `src/` folder list specified for TASK 01 (`store`, `types`, `data`,
 `utils`, `providers`, `screens`) differs from the layer list in CLAUDE.md §3 and PLAN.md
