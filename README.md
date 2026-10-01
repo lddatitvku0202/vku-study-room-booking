@@ -3,10 +3,10 @@
 VKU Mini-Project 2. A React Native (Expo) + TypeScript app for VKU students to find a
 study room or computer lab and book a `(room, date, time slot)`.
 
-- GitHub: [YOUR GITHUB URL]
+- GitHub: https://github.com/lddatitvku0202/vku-study-room-booking.git
 - Demo: runs in **Expo Go** (`npx expo start --tunnel`, then scan the QR code; see
   [How to run](#how-to-run)). Tested on a physical phone in Expo Go on 2026-10-01: PASS.
-- Video: [VIDEO URL]
+- Video: https://youtu.be/pB-orcaNmTw
 
 > **This is a Local Submission MVP.** It runs entirely on the phone:
 >
