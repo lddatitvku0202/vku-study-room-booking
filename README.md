@@ -4,8 +4,9 @@ VKU Mini-Project 2. A React Native (Expo) + TypeScript app for VKU students to f
 study room or computer lab and book a `(room, date, time slot)`.
 
 - GitHub: https://github.com/lddatitvku0202/vku-study-room-booking.git
-- Demo: runs in **Expo Go** (`npx expo start --tunnel`, then scan the QR code; see
-  [How to run](#how-to-run)). Tested on a physical phone in Expo Go on 2026-10-01: PASS.
+* Demo:
+  * **Web Demo:** [Cloudflare Pages](https://vku-study-room-booking-7i4.pages.dev/)
+  * **Mobile Demo:** runs in **Expo Go** (`npx expo start --tunnel`, then scan the QR code; see [How to run](https://github.com/lddatitvku0202/vku-study-room-booking#how-to-run)). Tested on a physical phone in Expo Go on 2026-10-01: PASS.
 - Video: https://youtu.be/pB-orcaNmTw
 
 > **This is a Local Submission MVP.** It runs entirely on the phone:
@@ -48,6 +49,34 @@ study room or computer lab and book a `(room, date, time slot)`.
 - **My Bookings:** Confirmed and Cancelled lists. You confirm before cancelling; a cancelled
   booking stays in the history, its slot becomes free, and its reminder is cancelled.
 - **Persistence:** bookings survive an app restart (AsyncStorage).
+
+## Demo screenshots
+
+Taken on a physical iPhone in Expo Go on 2026-10-01. The blue gear button in the top-right
+corner is Expo Go's developer menu, not part of the app.
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/01-browse-rooms.png" width="240" alt="Browse Rooms: 120 of 120 rooms"><br><b>1. Browse Rooms</b><br>120 rooms, demo status labels</td>
+    <td align="center"><img src="docs/screenshots/03-search.png" width="240" alt="Search for c2 shows 6 rooms"><br><b>2. Search</b><br>"c2" → 6 rooms (C201–C206)</td>
+    <td align="center"><img src="docs/screenshots/02-combined-filters.png" width="240" alt="Building A, 6+ seats, Projector and Whiteboard: 9 rooms"><br><b>3. Combined filters (AND)</b><br>A + 6+ seats + Projector + Whiteboard → 9</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/07-room-details-slots.png" width="240" alt="Room Details with date selector and time slots"><br><b>4. Room Details</b><br>7-day selector, 4 slots, "Your booking"</td>
+    <td align="center"><img src="docs/screenshots/08-conflict-alert.png" width="240" alt="Conflict alert"><br><b>5. Simulated conflict</b><br>Required alert; slot becomes Unavailable</td>
+    <td align="center"><img src="docs/screenshots/09-conflict-alternatives.png" width="240" alt="Alternatives after a simulated conflict"><br><b>6. Alternatives</b><br>Other free times, labelled as a demo conflict</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/06-booking-success-qr.png" width="240" alt="Booking confirmed with QR pass"><br><b>7. Booking confirmed</b><br>QR pass: bookingId | roomName | date | slotLabel</td>
+    <td align="center"><img src="docs/screenshots/04-my-bookings-confirmed.png" width="240" alt="My Bookings, confirmed list"><br><b>8. My Bookings</b><br>Confirmed list with Cancel buttons</td>
+    <td align="center"><img src="docs/screenshots/10-cancel-confirmation.png" width="240" alt="Cancel confirmation dialog"><br><b>9. Cancel confirmation</b><br>Confirm before cancelling</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/05-my-bookings-cancelled.png" width="240" alt="My Bookings, cancelled list"><br><b>10. Cancelled history</b><br>Cancelled bookings stay as history</td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
 
 ## Tech stack
 
