@@ -13,6 +13,7 @@
  * reused as a conflict engine.
  */
 
+import { isFirebaseMode } from '@/services/config';
 import { buildSlotKey } from '@/utils/slot-key';
 
 import type { Booking } from '@/types/booking';
@@ -56,6 +57,11 @@ export function createDemoBookingId(): string {
 export async function reserveRoomDemo(
   request: DemoReservationRequest,
 ): Promise<DemoReservationResult> {
+  if (isFirebaseMode) {
+    // Hard guard (AD-38): the random simulator must never decide a booking in
+    // firebase mode or in a production build.
+    throw new Error('The local booking simulator is disabled when DATA_SOURCE=firebase.');
+  }
   const delayMs = Math.round(
     DEMO_MIN_DELAY_MS + Math.random() * (DEMO_MAX_DELAY_MS - DEMO_MIN_DELAY_MS),
   );

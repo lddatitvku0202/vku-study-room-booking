@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "DATA_SOURCE": "firebase",
+        "APP_ENV": "production",
+        "USE_FIREBASE_EMULATOR": "false"
+      }
+    },
+    "production": {
+      "environment": "production",
+      "autoIncrement": true,
+      "env": {
+        "DATA_SOURCE": "firebase",
+        "APP_ENV": "production",
+        "USE_FIREBASE_EMULATOR": "false"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

@@ -7,9 +7,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "vn.edu.vku.studyroombooking"
     },
     "android": {
+      "package": "vn.edu.vku.studyroombooking",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -20,6 +22,13 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "firebase": {},
+      "eas": {
+        "projectId": "f3e3325b-59d8-4ea5-8846-6e0461557448"
+      }
+    },
+    "owner": "lddatitvku0202"
   }
 }
