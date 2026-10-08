@@ -16,6 +16,7 @@ import {
   sessionErrorCodeOf,
   subscribeToSession as subscribeFor,
 } from '@/services/firebase/auth';
+import { createBookingTransaction } from '@/services/firebase/booking-transactions';
 import { fetchRoomCatalogue } from '@/services/firebase/rooms';
 import {
   listenToDateLocks,
@@ -26,6 +27,7 @@ import {
 
 import type { Room } from '@/types/room';
 import type { UserSession } from '@/types/session';
+import type { BookingOutcome, BookingRequest } from '@/utils/booking-contract';
 
 export { getFirebaseServices, sessionErrorCodeOf };
 
@@ -98,4 +100,13 @@ export function subscribeToDateLocks(
 /** The signed-in uid, if any (never signs in). */
 export function currentUserId(): string | undefined {
   return getFirebaseServices().auth.currentUser?.uid;
+}
+
+/**
+ * Books a slot for the signed-in user through the atomic Firestore transaction.
+ * The Firestore commit is the only authority (I2); the outcome is typed.
+ */
+export async function createBooking(request: BookingRequest): Promise<BookingOutcome> {
+  const session = await ensureAnonymousSession();
+  return createBookingTransaction(getFirebaseServices().db, session.uid, request);
 }

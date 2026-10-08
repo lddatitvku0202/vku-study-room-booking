@@ -975,6 +975,37 @@ Commit: `feat(booking): add booking transaction contract`
 Known issues: none.
 Next task: 29R
 
+## 29R — Atomic Firestore booking transaction
+
+Status: DONE
+Implemented: `src/services/firebase/booking-transactions.ts` —
+`createBookingTransaction(db, uid, request)`:
+validate (contract) → `runTransaction`: `tx.get(slotLocks/{slotKey})` and
+`tx.get(bookings/{bookingId})` → `decideBookingOutcome` → on PROCEED `tx.set` the booking
+**and** the lock in the same transaction (server timestamps, `userId` = the authenticated
+uid, the booking stores its `slotKey`, the lock references `bookingId`/`userId`/`slotKey`).
+Typed outcome: success (with `replayed` for an idempotent retry) / conflict (`slotKey`) /
+error code. An existing-but-malformed lock still counts as taken. If Firestore aborts after
+its own retries under heavy contention, nothing was written, and a plain read reports what
+actually happened to the slot (conflict, or this attempt's own committed lock). No
+`writeBatch`, no pre-check-then-write, no `Math.random`. `services/firebase/index.ts`
+exposes `createBooking(request)` (ensures the anonymous session, passes its uid).
+Verification:
+  typecheck / lint → PASS
+  npm run test:rules → 60/60 (+9 transaction tests, real rules):
+    free slot → booking + lock committed together (1 lock, 1 booking)
+    **N = 20 users race for one slot → exactly 1 success, 19 SLOT_TAKEN; 1 lock, 1 booking**
+    retry with the same bookingId → same booking, `replayed: true`, still 1 + 1 (I6)
+    double tap (two concurrent calls, same attempt) → both report success, still 1 + 1
+    later attempt on a taken slot → typed conflict with the slot key
+    reusing a cancelled booking's id → BOOKING_ID_CONFLICT
+    past / outside window / unknown slot → typed errors before any network call
+    signed-out client → PERMISSION_DENIED; forged uid → PERMISSION_DENIED, nothing written
+  Stability: the transaction file run 5 times in one emulator session → 9/9 each time
+Commit: `feat(booking): add atomic firestore booking transaction`
+Known issues: none. The UI still refuses firebase-mode booking until 31R wires this in.
+Next task: 30R
+
 ---
 
 ## Task log template
