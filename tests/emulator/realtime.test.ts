@@ -113,7 +113,11 @@ describe('two clients, one slot grid', () => {
       date,
       slot: FIRST_SLOT,
     };
-    const bookingA101: NewBookingInput = { ...bookingB205, bookingId: 'rt-a101-booking', room: ROOM_A101 };
+    const bookingA101: NewBookingInput = {
+      ...bookingB205,
+      bookingId: 'rt-a101-booking',
+      room: ROOM_A101,
+    };
     await book(booker.db, bookingA101); // another room: must not appear in this grid
     await book(booker.db, bookingB205);
 
@@ -142,7 +146,12 @@ describe('two clients, one slot grid', () => {
       slot: FIRST_SLOT,
     };
     await book(booker.db, base);
-    await book(booker.db, { ...base, bookingId: 'day-booking-2', room: ROOM_A101, slot: LAST_SLOT });
+    await book(booker.db, {
+      ...base,
+      bookingId: 'day-booking-2',
+      room: ROOM_A101,
+      slot: LAST_SLOT,
+    });
     await day.waitFor((s) => s.locks.length === 2);
     stop();
   });
