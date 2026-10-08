@@ -1077,6 +1077,35 @@ Known issues: My Bookings and cancellation in firebase mode come in 34R/35R; rem
 firebase mode are bound to confirmed bookings in 39R.
 Next task: 34R
 
+## 34R — My Bookings from Firestore
+
+Status: DONE
+Implemented:
+- `services/firebase/bookings.ts` — `listenToUserBookings(db, uid)`: realtime
+  `bookings where userId == uid` (the only list the rules allow), validated documents.
+  `services/firebase/index.ts` — `subscribeToMyBookings` (after the session exists).
+- `hooks/useMyBookings.ts` — mock: the device store (MVP); firebase: the listener bridged
+  into the TanStack Query cache (`bookingKeys.mine(uid)`). Firebase bookings are never
+  written to Zustand or persisted to AsyncStorage; `notificationIds` stay device-local.
+- `hooks/useBooking.ts` — firebase mode reads from the realtime list first (a cancellation
+  shows at once), falling back to the one-off read seeded by the transaction.
+- `MyBookingsScreen` — `useMyBookings`; loading, empty ("Bạn chưa có lịch đặt phòng") and a
+  new error state; caption per mode. Cancellation in firebase mode arrives in 35R (until
+  then the button does nothing in firebase mode — no local cancel, no fake success).
+Verification:
+  typecheck / lint / format → PASS
+  npm run test:rules → 72/72 (+2): Alice's listener holds exactly her 2 bookings and Bob's
+    exactly his 1; after Alice's coupled cancellation her list still holds 2, one now
+    `cancelled` with `cancelledAt`; Bob listing Alice's bookings → permission-denied
+  Production, real UI (two browser profiles): A books Computer Lab V505, B books V504; A's
+    My Bookings shows only V505 (Confirmed (1)), B's only V504; the Firestore caption is
+    shown; A's cancellation (as owner) appears in realtime as Confirmed (0) / Cancelled (1);
+    B's booking cancelled as owner (cleanup); no page errors
+  Mock-mode browser regression → PASS
+Commit: `feat(bookings): read user bookings from firestore`
+Known issues: none beyond 35R scope.
+Next task: 35R
+
 ---
 
 ## Task log template

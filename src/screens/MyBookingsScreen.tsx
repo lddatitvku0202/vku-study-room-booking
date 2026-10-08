@@ -9,7 +9,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Screen } from '@/components/ui/Screen';
 import { colors, spacing } from '@/data/theme';
 import { useCancelBooking } from '@/hooks/useCancelBooking';
-import { useBookingStore, useBookingStoreHydrated } from '@/store/useBookingStore';
+import { useDataSource } from '@/hooks/useDataSource';
+import { useMyBookings } from '@/hooks/useMyBookings';
 import { countBookingsByStatus, getBookingsByStatus } from '@/utils/booking-list';
 
 import type { MainTabScreenProps } from '@/navigation/types';
@@ -42,13 +43,14 @@ function ItemSeparator(): JSX.Element {
 }
 
 /**
- * "My Bookings" tab: the demo bookings saved on this device, filtered by status.
+ * "My Bookings" tab, filtered by status. Mock: the demo bookings saved on this
+ * device. Firebase: this account's bookings from Firestore, updated in realtime.
  * Confirmed bookings can be cancelled; a cancelled booking stays as history and
  * its slot becomes bookable again.
  */
 export function MyBookingsScreen({ navigation }: MainTabScreenProps<'MyBookings'>): JSX.Element {
-  const bookings = useBookingStore((state) => state.bookings);
-  const isHydrated = useBookingStoreHydrated();
+  const isFirebase = useDataSource() === 'firebase';
+  const { bookings, isLoading, hasError } = useMyBookings();
   const cancelBooking = useCancelBooking();
   const [statusFilter, setStatusFilter] = useState<BookingStatus>('confirmed');
 
@@ -94,13 +96,28 @@ export function MyBookingsScreen({ navigation }: MainTabScreenProps<'MyBookings'
     [confirmCancel],
   );
 
-  if (!isHydrated) {
+  if (isLoading) {
     return (
       <Screen>
         <View style={styles.loading}>
           <ActivityIndicator color={colors.primary} />
           <AppText color="textSecondary">Loading your bookings…</AppText>
         </View>
+      </Screen>
+    );
+  }
+
+  if (hasError && bookings.length === 0) {
+    return (
+      <Screen>
+        <View style={styles.header}>
+          <AppText variant="title">My Bookings</AppText>
+        </View>
+        <EmptyState
+          icon="⚠️"
+          title="Could not load your bookings"
+          message="Check your connection. The list updates automatically when the server can be reached."
+        />
       </Screen>
     );
   }
@@ -129,7 +146,9 @@ export function MyBookingsScreen({ navigation }: MainTabScreenProps<'MyBookings'
       <View style={styles.header}>
         <AppText variant="title">My Bookings</AppText>
         <AppText variant="caption" color="textSecondary">
-          Demo bookings saved on this device only — not synchronized with other users.
+          {isFirebase
+            ? 'Your bookings from Firestore (this anonymous account) — updated in realtime.'
+            : 'Demo bookings saved on this device only — not synchronized with other users.'}
         </AppText>
         <View style={styles.filters}>
           <FilterChip

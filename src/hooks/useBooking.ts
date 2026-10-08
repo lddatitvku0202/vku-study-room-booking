@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { bookingKeys } from '@/hooks/query-keys';
 import { useDataSource } from '@/hooks/useDataSource';
+import { useMyBookings } from '@/hooks/useMyBookings';
 import { loadFirebaseBackend } from '@/services/firebase-backend';
 import { useBookingStore } from '@/store/useBookingStore';
 
@@ -15,13 +16,15 @@ export interface BookingLookup {
 /**
  * One booking by id.
  * - mock: the device store (the MVP);
- * - firebase: Firestore through TanStack Query (owner-only by the rules). The
- *   booking transaction seeds this cache entry with its confirmed result, so the
- *   confirmation screen renders at once and then revalidates from the server.
+ * - firebase: the realtime My Bookings list (so a cancellation shows at once),
+ *   falling back to a one-off Firestore read seeded by the booking transaction's
+ *   confirmed result while that list is still loading. Owner-only by the rules.
  */
 export function useBooking(bookingId: string): BookingLookup {
   const isFirebase = useDataSource() === 'firebase';
   const stored = useBookingStore((state) => state.bookings.find((b) => b.id === bookingId));
+  const mine = useMyBookings();
+  const live = isFirebase ? mine.bookings.find((b) => b.id === bookingId) : undefined;
 
   const remote = useQuery({
     queryKey: bookingKeys.detail(bookingId),
@@ -35,5 +38,6 @@ export function useBooking(bookingId: string): BookingLookup {
   if (!isFirebase) {
     return { booking: stored, isLoading: false };
   }
-  return { booking: remote.data ?? undefined, isLoading: remote.isPending };
+  const booking = live ?? remote.data ?? undefined;
+  return { booking, isLoading: booking === undefined && (remote.isPending || mine.isLoading) };
 }

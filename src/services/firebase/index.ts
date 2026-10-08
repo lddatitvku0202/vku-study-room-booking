@@ -17,7 +17,7 @@ import {
   subscribeToSession as subscribeFor,
 } from '@/services/firebase/auth';
 import { createBookingTransaction } from '@/services/firebase/booking-transactions';
-import { fetchBookingDocument } from '@/services/firebase/bookings';
+import { fetchBookingDocument, listenToUserBookings } from '@/services/firebase/bookings';
 import { fetchRoomCatalogue } from '@/services/firebase/rooms';
 import {
   listenToDateLocks,
@@ -117,4 +117,19 @@ export async function createBooking(request: BookingRequest): Promise<BookingOut
 export async function fetchBooking(bookingId: string): Promise<Booking | null> {
   await ensureAnonymousSession();
   return fetchBookingDocument(getFirebaseServices().db, bookingId);
+}
+
+/** Realtime list of the signed-in user's bookings (starts once the session exists). */
+export function subscribeToMyBookings(
+  onNext: (bookings: readonly Booking[]) => void,
+  onError: (error: unknown) => void,
+): () => void {
+  return afterSession(() => {
+    const uid = currentUserId();
+    if (uid === undefined) {
+      onError(new Error('No signed-in user.'));
+      return () => undefined;
+    }
+    return listenToUserBookings(getFirebaseServices().db, uid, onNext, onError);
+  }, onError);
 }
