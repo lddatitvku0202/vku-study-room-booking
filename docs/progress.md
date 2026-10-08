@@ -769,6 +769,41 @@ Known issues: native persistence (AsyncStorage) is not exercised on a device her
 web path is. Clearing app data or reinstalling creates a new anonymous identity (AD-36).
 Next task: 07R
 
+## 07R — Firestore persistence model and converters
+
+Status: DONE
+Implemented:
+- **Domain types:** `Booking` gained `slotKey` (required), `updatedAt?`, `cancelledAt?`;
+  `SlotLock` gained `userId`. Pure type guards in `utils/domain-guards.ts` (`isBuilding`,
+  `isEquipment`, `isBookingStatus`, `findTimeSlot`, `isDateKey`) — external data is
+  narrowed, never cast.
+- **Mock compatibility:** `parseStoredBooking` (`utils/booking-rules.ts`) replaces
+  `isBooking`. Bookings saved on devices by the submitted MVP have no `slotKey`; it is
+  derived from their own room/date/slot, so they keep working instead of being dropped.
+  The simulator now sets `slotKey`; a mock cancel records `updatedAt`/`cancelledAt`.
+- **Firestore model** (`services/firebase/model.ts`): collections `rooms/{roomId}`,
+  `bookings/{bookingId}`, `slotLocks/{slotKey}`; document types; writers
+  `roomToDocument`, `newBookingDocument`, `newSlotLockDocument`, `cancellationUpdate`
+  (server timestamps for `createdAt` / `updatedAt` / `cancelledAt`; the booking also stores
+  `bookingId` = its document id and the `slotKey` it owns); validating readers
+  `roomFromDocument`, `bookingFromDocument`, `slotLockFromDocument` that return `null` for a
+  malformed document (slot id/label/times must match one of the four slots, `slotKey` must
+  equal `roomId_date_slotId`, timestamps must be Firestore timestamps).
+- **Indexes:** the three planned queries (`bookings where userId ==`, `slotLocks where
+  roomId == and date ==`, `slotLocks where date ==`) use automatic single-field indexes,
+  so `firestore.indexes.json` stays empty (documented in the model file).
+Verification:
+  typecheck / lint / format → PASS
+  npm test → 57/57, including: all 120 rooms round-trip unchanged; a written booking and lock
+    round-trip to the expected domain objects; exact written field sets; cancelled booking
+    read with `cancelledAt`; 6 malformed rooms, 10 malformed bookings and 5 malformed locks
+    rejected; MVP-format stored bookings upgraded; mismatched stored keys dropped
+  Mock-mode browser regression (fresh export) → 8/8 (book, simulated conflict, Unavailable
+    slot, alternatives, success, cancel confirm, keep, cancel)
+Commit: `feat(firestore): define typed persistence model and converters`
+Known issues: none.
+Next task: 09R
+
 ---
 
 ## Task log template

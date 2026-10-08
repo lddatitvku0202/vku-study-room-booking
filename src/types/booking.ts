@@ -18,8 +18,9 @@ export type BookingStatus = 'confirmed' | 'cancelled';
  * readable without a second lookup, and so a past booking still renders
  * correctly if the room catalogue changes later.
  *
- * `date` is `yyyy-MM-dd`; `startTime`/`endTime` are `HH:mm`; `createdAt` is an
- * ISO 8601 string.
+ * `date` is `yyyy-MM-dd`; `startTime`/`endTime` are `HH:mm`; timestamps are
+ * ISO 8601 strings. In Firestore, `createdAt` / `updatedAt` / `cancelledAt` are
+ * server timestamps (07R).
  */
 export interface Booking {
   readonly id: string;
@@ -32,8 +33,17 @@ export interface Booking {
   readonly slotLabel: string;
   readonly startTime: string;
   readonly endTime: string;
+  /**
+   * The lock this booking owns, `roomId_date_slotId` (= `buildSlotKey(...)`).
+   * Stored on the booking so cancellation releases the right lock without
+   * recomputing it (PLAN.md TASK 07).
+   */
+  readonly slotKey: string;
   readonly status: BookingStatus;
   readonly createdAt: string;
+  readonly updatedAt?: string | undefined;
+  /** Set when the booking is cancelled. */
+  readonly cancelledAt?: string | undefined;
 }
 
 /**
@@ -41,7 +51,7 @@ export interface Booking {
  *
  * Its existence is what makes a slot taken — invariant I1: at most one active
  * lock per `slotKey`. The lock is created in the same transaction as its
- * booking and released when that booking is cancelled.
+ * booking and deleted in the same transaction that cancels it.
  *
  * `slotKey` is the document id, formatted `roomId_date_slotId`.
  */
@@ -51,5 +61,7 @@ export interface SlotLock {
   readonly date: string;
   readonly slotId: string;
   readonly bookingId: string;
+  /** Owner of the booking holding this lock (always `request.auth.uid` of the writer). */
+  readonly userId: string;
   readonly createdAt: string;
 }

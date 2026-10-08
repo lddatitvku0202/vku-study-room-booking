@@ -63,8 +63,9 @@ export async function reserveRoomDemo(
 
   const { bookingId, room, date, slot } = request;
 
+  const slotKey = buildSlotKey(room.id, date, slot.id);
   if (Math.random() >= DEMO_SUCCESS_RATE) {
-    return { kind: 'conflict', slotKey: buildSlotKey(room.id, date, slot.id), delayMs };
+    return { kind: 'conflict', slotKey, delayMs };
   }
 
   return {
@@ -81,6 +82,7 @@ export async function reserveRoomDemo(
       slotLabel: slot.label,
       startTime: slot.start,
       endTime: slot.end,
+      slotKey,
       status: 'confirmed',
       createdAt: new Date().toISOString(),
     },

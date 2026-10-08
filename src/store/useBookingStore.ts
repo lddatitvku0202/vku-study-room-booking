@@ -20,7 +20,7 @@ import { useSyncExternalStore } from 'react';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { findConfirmedBooking, getBookingSlotKey, isBooking } from '@/utils/booking-rules';
+import { findConfirmedBooking, getBookingSlotKey, parseStoredBooking } from '@/utils/booking-rules';
 import { EMPTY_FILTERS } from '@/utils/room-filters';
 
 import type { Booking } from '@/types/booking';
@@ -86,7 +86,13 @@ function readPersistedBookings(persisted: unknown): readonly Booking[] {
     return [];
   }
   const list: unknown = persisted['bookings'];
-  return Array.isArray(list) ? list.filter((item: unknown) => isBooking(item)) : [];
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  return list.flatMap((item: unknown) => {
+    const booking = parseStoredBooking(item);
+    return booking === undefined ? [] : [booking];
+  });
 }
 
 /** Validates the saved notification id map; non-string entries are dropped. */
@@ -153,7 +159,13 @@ export const useBookingStore = create<BookingStoreState>()(
         if (target.status === 'cancelled') {
           return { kind: 'already-cancelled' };
         }
-        const cancelled: Booking = { ...target, status: 'cancelled' };
+        const now = new Date().toISOString();
+        const cancelled: Booking = {
+          ...target,
+          status: 'cancelled',
+          updatedAt: now,
+          cancelledAt: now,
+        };
         const slotKey = getBookingSlotKey(target);
         const notificationId = notificationIds[bookingId];
         const remainingNotificationIds = Object.fromEntries(
