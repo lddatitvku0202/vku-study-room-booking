@@ -49,7 +49,8 @@ atomicity, and Security Rules provide the enforcement.
 
 ## Required features
 
-- Email/password authentication with a per-user profile.
+- Anonymous Firebase Authentication — every write carries a verified uid (AD-36; the earlier
+  email/password scope is superseded).
 - Room catalogue of **120+ rooms**, virtualized list.
 - In-memory text search (diacritic-insensitive) across name, code, building, equipment.
 - Multi-dimension filters: building, type, capacity, equipment, available-now.
@@ -279,7 +280,7 @@ otherwise.
 
 **There is no backend.** The app talks to Firebase directly:
 
-- **Firebase Authentication** — email/password. `request.auth.uid` is the only trusted
+- **Firebase Authentication** — anonymous (AD-36). `request.auth.uid` is the only trusted
   identity, and rules reject any document whose `userId` does not match it.
 - **Cloud Firestore (client SDK)** — reads, realtime listeners, and transactional writes.
 - **Firestore Security Rules** — the entire server-side enforcement layer.
@@ -413,8 +414,8 @@ availability is correct the moment a lock is created or released.
 ## Navigation strategy
 
 - React Navigation with **fully typed** param lists; no stringly-typed routes.
-- Root switch between an Auth stack and an App tab navigator, gated on auth state with no
-  flash of the wrong stack.
+- No Auth stack: anonymous sign-in happens in the background in firebase mode (AD-36), so the
+  app opens straight into the tab navigator.
 - Tabs: **Rooms** · **My Bookings** · **Profile**.
 - Native stack for Room Detail and Booking Confirmation.
 - Deep linking for notification taps, handled from cold start, background and foreground;

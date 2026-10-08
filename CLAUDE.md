@@ -28,7 +28,9 @@ outcome in `docs/progress.md`, and update this file.
 - The project runs on the **Firebase Spark plan**. No billing, no Blaze.
   Never introduce a feature that requires billing to be enabled.
 - The only backend services are **Firebase Authentication**, **Cloud Firestore**, and
-  **Firestore Security Rules**.
+  **Firestore Security Rules**. Authentication is **anonymous** (AD-36).
+- The app has an explicit data-source switch, `DATA_SOURCE=mock|firebase` (default `mock`,
+  AD-37). Firebase is initialized lazily, only in firebase mode, and never from `index.ts`.
 - Documentation must never claim Spark is unlimited. The correct phrasing is:
   *"Free quota applies within Firebase Spark plan limits."*
 
@@ -273,6 +275,9 @@ The 70/30 requirement is **traffic/scenario distribution**, never a forced outco
   fabricated result, mocked booking path, or conflict-engine bypass.
 - Reported ratios are **measured**, not asserted. The observed split will approximate
   70/30 rather than match it exactly, and the docs must say so.
+- **Mock-mode exception (AD-38):** the Emergency MVP's `Math.random()` simulator survives
+  only in `DATA_SOURCE=mock`, labelled as a local simulation. Firebase mode and production
+  builds never call it.
 
 ## 11. TypeScript rules
 

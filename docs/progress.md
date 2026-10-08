@@ -5,13 +5,14 @@ task's commit. Never report progress that has not been verified.
 
 ---
 
-## Emergency Submission MVP (active track)
+## Emergency Submission MVP (completed — now the mock-mode baseline)
 
-**The production Firebase track is PAUSED** for the submission deadline. The MVP is a
-temporary implementation that runs on local mock data. The production architecture, the
-roadmap in `PLAN.md`, and the decision register below are **unchanged and still
-authoritative**; nothing here overrides them. TASK 06 (Firebase wiring) was rolled back
-before commit and is not in the repository.
+**Completed and submitted** (MVP-01 … MVP-07, physical-device test PASS on 2026-10-01). The
+MVP is the baseline for the post-MVP Firebase bridge: it survives unchanged as
+`DATA_SOURCE=mock` (AD-37). Its exceptions to CLAUDE.md (random conflict simulator,
+bookings in Zustand/AsyncStorage) are **mock-mode only** (AD-38). TASK 06 (Firebase wiring)
+was rolled back before commit; its work exists only as `stash@{0}`, which is reference
+material and is never applied (AD-39).
 
 MVP rules: no Firebase, no network, no API. Mock data is labelled as mock and is never
 presented as server data. Code still follows the locked architecture (`screens → hooks →
@@ -618,28 +619,48 @@ notification delivery on a device.
 
 ## Current state
 
-**Status:** READY FOR REVIEW
-**Current Task:** TASK 05 — Design tokens
-**Completed Tasks:** TASK 00 (planning baseline), TASK 00B (architecture lock-in),
-TASK 01 (Expo scaffold, `7b9f4f4`), TASK 02 (strict TS + lint baseline, `3fef414`),
-TASK 03 (architecture + domain types, `092cdf4`), TASK 04 (environment config, **not yet
-committed**)
-**Next Task:** TASK 05B — Base UI primitives
-**Known Issues:** none. `.env` currently holds **placeholder** Firebase values so the app
-boots; TASK 06 replaces them with the real web config.
+**Status:** Post-MVP bridge in progress — Firebase realtime work resumed from the MVP baseline.
+**Baseline:** HEAD `9f74c86` ("docs: add pictures demo"), clean, typecheck + lint PASS,
+identical to `origin/main` at the time of R0.
+**Completed:** TASK 00 – TASK 05 (foundation) and the Emergency Submission MVP (MVP-01 –
+MVP-07, `b989d6f` … `c5bfb93`), plus web dependencies (`1565b1b`) and README demo assets
+(`7c6eb50`, `9f74c86`). The MVP is deployed as a local-data web demo at
+https://vku-study-room-booking-7i4.pages.dev/.
+**Current Task:** Post-MVP bridge — see PLAN.md "Phase B". R0 (this documentation
+reconciliation) → W1 → 06R → …
+**Firebase status at R0:** **not live.** No Firebase SDK installed, no Firebase import in
+`src/`, no `firebase.json`, no rules, no indexes in the repository. The Firebase project
+`vku-study-room-booking` exists (Spark, Firestore `(default)` Native in
+`asia-southeast1`, no web app registered yet, no indexes).
+**Superseded:** TASK 05B (base UI primitives) — delivered by the MVP in
+`src/components/ui/`. Original TASK 06 – TASK 48 are re-sequenced as bridge tasks (PLAN.md
+Phase B) that build on the MVP instead of replacing it.
 
-**Repository state:** planning documents, an Expo SDK 57 + TypeScript scaffold with the
-code-quality baseline, the domain type layer, and typed runtime configuration. Runtime
-dependencies: `expo`, `expo-constants`, `expo-status-bar`, `react`, `react-native`,
-`react-native-safe-area-context`. Dev dependencies: `typescript`, `@types/react`,
-`eslint`, `eslint-config-expo`, `prettier`.
-No Firebase SDK, navigation, state, query, notification, QR or business logic exists —
-the only code is types, static slot data, config parsing, and the placeholder root screen.
-Git repository on `main`; planning `bf07557`, scaffold `7b9f4f4`, tooling `3fef414`,
-types `092cdf4`; the TASK 04 changes are **uncommitted and unpushed**, awaiting user
-review. Nothing may be pushed without explicit user approval.
+**Prerequisites / environment:**
+- Firebase emulators need **Java 21+** (firebase-tools 15.x). The default `java` on PATH is
+  1.8.0_202; a JDK 21 is installed at `C:\Program Files\Eclipse Adoptium\jdk-21.0.6.7-hotspot`
+  and is put first on PATH only for emulator commands (the system Java is left untouched).
+- The Firebase CLI is authenticated by the project owner; the project is selected per
+  command or via `.firebaserc`.
 
-**Blocked on:** nothing.
+**Blocked on:** nothing at R0.
+
+---
+
+## Post-MVP bridge log
+
+## R0 — Post-MVP baseline and Firebase resume decisions
+
+Status: DONE
+Implemented: documentation only — `docs/progress.md` (current state, AD-36 … AD-44,
+superseded entries, this log), `PLAN.md` (Phase B bridge tasks; TASK 08 now anonymous),
+`CLAUDE.md` (§2 and §10 reference the bridge decisions), `docs/project-brief.md` (auth
+lines point to AD-36). No code, package or configuration change.
+Verification: `git diff --stat` touches only the four documents; `npm run typecheck` and
+`npm run lint` PASS; `stash@{0}` still present.
+Commit: `docs(progress): record post-MVP baseline and Firebase resume decisions`
+Known issues: none.
+Next task: W1
 
 ---
 
@@ -1029,6 +1050,22 @@ the user, record the outcome here with the superseding decision, and update `CLA
 | AD-18 | Separate dev and production Firebase projects, both on Spark; local work uses the Emulator Suite where appropriate. | Seed and load tests must never touch production. | Fixed (revised TASK 00B) |
 | AD-19 | **Three deployables:** client, Security Rules, Firestore indexes. Deploy rules and indexes **before** the client. | They can be out of step; a rules change is a security change. | Fixed (revised TASK 00B) |
 
+### Post-MVP bridge (R0, 2026-10-08)
+
+Recorded before any Firebase code is written, so the bridge tasks cannot drift.
+
+| # | Decision | Rationale | Status |
+|---|---|---|---|
+| AD-36 | **Firebase Anonymous Authentication** is the sign-in method. Every booking write still carries a verified `request.auth.uid`. Supersedes the email/password scope of PLAN.md TASK 08 and the brief. | No account friction for a campus booking demo; the security model only needs a verified uid, not a profile. Limitation: the uid (and therefore "My Bookings") is tied to one install — clearing app data or reinstalling starts a new identity. | Fixed (R0) |
+| AD-37 | **Explicit data-source switch** `DATA_SOURCE=mock\|firebase`, default **`mock`**. `mock` = the MVP exactly as submitted (no Firebase initialized, no network). `firebase` = Firestore is the authority. Firebase is initialized **lazily** on first use in firebase mode — never as a side effect of `index.ts` or `App.tsx`. | The working MVP and its web deployment must not break while Firebase is integrated, and each Firebase path can be verified before it becomes the default. | Fixed (R0) |
+| AD-38 | The MVP's exceptions to CLAUDE.md — the `Math.random()` 70/30 simulator (§10/I8) and bookings held in Zustand + AsyncStorage (§5) — are **temporary and mock-mode only**. Firebase mode never calls the simulator and never treats Zustand/AsyncStorage as the owner of a booking. Production builds use `DATA_SOURCE=firebase`. | Keeps the submitted MVP intact without letting a fake outcome or a local authority reach production. | Fixed (R0) |
+| AD-39 | `stash@{0}` ("wip: paused Firebase foundation TASK 06") is **reference material only**: never applied, popped or dropped. Its code is rebuilt selectively against the current codebase. | Applying it conflicts with `package.json`/lockfile and would add a boot-time Firebase import that breaks mock mode and the web build. | Fixed (R0) |
+| AD-40 | **Platform-specific Auth persistence:** native uses `getReactNativePersistence(AsyncStorage)`; web uses browser persistence. No React-Native-only Firebase API is reachable from the web bundle. | `getReactNativePersistence` exists only in Firebase Auth's React Native build. | Fixed (R0) |
+| AD-41 | **Web compatibility:** react-native-web's `Alert.alert` is a no-op, so confirmations and notices go through a cross-platform dialog helper. The Cloudflare web demo stays in mock mode unless the owner redeploys it otherwise. | The deployed web demo could not cancel bookings or show the conflict message. | Fixed (R0) |
+| AD-42 | Production Firebase project is **`vku-study-room-booking`** (Spark, `asia-southeast1`). Emulator runs use a `demo-` project id so they can never reach production. No Cloud Functions, no Blaze. | One explicit production target; tests are physically isolated from it. | Fixed (R0) |
+| AD-43 | **Campus timezone is fixed at UTC+07** (Asia/Ho_Chi_Minh, no DST) for server-side time checks in Security Rules (past slot, booking window). | Rules have no timezone database; a fixed offset is exact for Vietnam. | Fixed (R0) |
+| AD-44 | **No offline booking queue** (restates AD-17 for the bridge): bookings and cancellations are written only through `runTransaction()` (which cannot be queued), never `setDoc`/batch; booking is enabled only when slot availability is confirmed by the server, and an unconfirmed outcome is reported as unconfirmed, never as success. | A queued write would replay later against a changed lock state. | Fixed (R0) |
+
 ### Superseded decisions
 
 Removed from the architecture in TASK 00B. Listed only so a future session recognises them
@@ -1042,6 +1079,8 @@ as obsolete if it encounters them in old notes.
 | ~~Blaze plan requirement~~ | Deployment requires a billing-enabled project. | AD-25 — Spark plan, no billing. |
 | ~~`functions/` workspace~~ | A TypeScript Cloud Functions workspace with Admin SDK. | Removed; no equivalent exists. |
 | ~~Cloud Functions deployable~~ | A fourth deployable alongside client, rules and indexes. | AD-19 — three deployables. |
+| ~~Email/password auth (PLAN TASK 08)~~ | Sign-up/sign-in/sign-out with a `users/{uid}` profile. | AD-36 — Anonymous Authentication; no profile collection. |
+| ~~TASK 06 as stashed~~ | Firebase initialized as a side effect of `index.ts`. | AD-37/AD-39 — lazy initialization behind the data-source switch. |
 
 ---
 

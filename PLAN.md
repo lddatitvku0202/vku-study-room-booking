@@ -1,7 +1,9 @@
 # PLAN.md — VKU Study Room Booking Development Roadmap
 
 Sequenced roadmap from empty repository to a production-ready build.
-Phases 0-1 are under way; see `docs/progress.md` for the authoritative current state.
+Phases 0-1 are done and the Emergency Submission MVP is complete. Remaining work follows
+**Phase B — Post-MVP bridge** at the end of this file, which re-sequences TASK 06 onward
+on top of the MVP. See `docs/progress.md` for the authoritative current state.
 
 **Architecture baseline (locked in TASK 00B):** no Cloud Functions, Firebase Spark plan,
 client `runTransaction()` as booking authority, `slotLocks` as the availability lock,
@@ -187,8 +189,9 @@ task works. "It compiles" is never sufficient on its own.
 ### TASK 08 — Authentication
 - **Objective:** VKU students sign in; every write carries a verified identity.
 - **Dependencies:** TASK 06.
-- **Implementation scope:** Firebase Auth email/password, sign-up/sign-in/sign-out
-  services, auth-state observer, `users/{uid}` profile bootstrap, typed auth error mapping.
+- **Implementation scope:** **Firebase Anonymous Authentication** (AD-36 — supersedes the
+  earlier email/password scope): anonymous sign-in, auth-state observer, typed session and
+  auth error mapping. No profile collection.
 - **Acceptance criteria:** auth state survives app restart; the profile document is created
   idempotently; errors are typed and human-readable; **no role or privileged field is
   client-writable**.
@@ -808,3 +811,42 @@ a `functions/` workspace, the Blaze plan, or any billing-enabled service.**
 
 **No task is blocked on an open question.** All eight questions from TASK 00 were resolved
 in TASK 00B; see `docs/progress.md` §Resolved open questions.
+
+---
+
+## Phase B — Post-MVP bridge (Firebase resume)
+
+Added in R0 (2026-10-08). The Emergency Submission MVP is the baseline and stays available as
+`DATA_SOURCE=mock` (AD-37). Every bridge task keeps mock mode behaving exactly as submitted,
+and adds or verifies one Firebase path behind `DATA_SOURCE=firebase`. The original task
+whose intent a bridge task carries is shown in brackets; its acceptance criteria still apply
+unless a decision (AD-36 … AD-44) changed them.
+
+| Task | Goal | Commit |
+|---|---|---|
+| R0 | Reconcile documentation with the post-MVP repository; record AD-36 … AD-44 | `docs(progress): record post-MVP baseline and Firebase resume decisions` |
+| W1 | Cross-platform dialogs so confirmations and notices work on react-native-web | `fix(web): make confirmations and alerts work on react-native-web` |
+| 06R [06] | Lazy Firebase foundation behind the data-source switch; platform-specific Auth persistence; `firebase.json`, `.firebaserc`, emulator config | `feat(firebase): add lazy firebase foundation behind data-source flag` |
+| 08R [08] | Anonymous Auth session (`services/firebase/auth.ts`, `hooks/useSession.ts`) | `feat(auth): add firebase anonymous session` |
+| 07R [07] | Firestore persistence model, typed converters, server timestamps, indexes | `feat(firestore): define typed persistence model and converters` |
+| 09R [09] | Security Rules v1 (deny by default, ownership, booking ↔ lock coupling) + emulator tests | `feat(security): add firestore rules and emulator tests` |
+| 10R [10] | Idempotent seed of the 120 MVP rooms (same ids) | `feat(data): add idempotent firestore room seed` |
+| 12R [12, 13] | Firestore room repository behind the switch; screens unchanged | `feat(rooms): read rooms from firestore behind data-source flag` |
+| 26R [19, 26] | `onSnapshot` slot-lock listeners bridged into TanStack Query; derived room status | `feat(realtime): bridge slot lock listeners into query cache` |
+| 28R [28] | Pure booking contract: validation, stable ids, typed errors, outcome decision | `feat(booking): add booking transaction contract` |
+| 29R [29] | Atomic `runTransaction()` booking writing booking + lock together | `feat(booking): add atomic firestore booking transaction` |
+| 30R [30] | Rules enforce the transaction invariants; emulator concurrency test (N=20) | `feat(security): enforce booking transaction invariants` |
+| 31R [31] | `useCreateBooking`: simulator in mock mode, transaction in firebase mode | `feat(booking): wire firestore booking mutation and conflict UX` |
+| 34R [34] | My Bookings from Firestore (owner-scoped listener) | `feat(bookings): read user bookings from firestore` |
+| 35R [35] | Cancellation transaction releasing the lock | `feat(bookings): add cancellation transaction and lock release` |
+| 39R [37, 39] | QR and reminders bound to server-confirmed bookings | `feat(notifications): bind qr and reminders to confirmed bookings` |
+| 32R/33R [32, 33] | Real-transaction 70/30 contention demo (measured, never forced) | `feat(demo): add real-transaction contention simulation` |
+| 36R [36] | Offline policy: no queue, booking lockout without server-confirmed availability | `feat(booking): enforce offline booking lockout` |
+| RD [47, 48] | Production configuration, build profiles and documentation | `docs(release): …` / `chore(release): …` |
+
+Superseded by the MVP and not scheduled separately: TASK 05B (UI primitives), TASK 11 (Query
+provider), TASK 14/15 (client store and persistence, as one store), TASK 16 (navigation —
+without an auth stack, since anonymous sign-in needs none), TASK 18, 21–25 (list, search,
+filters, states, detail, slot grid), TASK 37/38 (QR, notification permissions). Not yet
+scheduled: TASK 17 (deep links), 20/45 (profiling), 27 (listener quota guards beyond
+scoping), 40–42 (Reanimated, gestures, accessibility pass), 46 (CI).
