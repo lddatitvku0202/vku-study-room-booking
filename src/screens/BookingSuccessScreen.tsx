@@ -120,7 +120,16 @@ export function BookingSuccessScreen({
           />
         </FadeIn>
 
-        <BookingPass payload={passPayload} />
+        {isConfirmed ? (
+          <BookingPass payload={passPayload} />
+        ) : (
+          // A cancelled booking must not keep showing a pass that looks valid (TASK 37).
+          <Card style={styles.withdrawn}>
+            <AppText style={styles.centered} color="textSecondary">
+              Booking pass withdrawn — this booking was cancelled.
+            </AppText>
+          </Card>
+        )}
 
         <Card style={styles.card}>
           <DetailRow label="Booking ID" value={booking.id} />
@@ -183,6 +192,9 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: spacing.md,
+  },
+  withdrawn: {
+    paddingVertical: spacing.lg,
   },
   row: {
     gap: spacing.xs / 2,

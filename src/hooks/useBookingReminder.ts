@@ -24,7 +24,16 @@ const PENDING: ReminderStatus = { kind: 'pending' };
 // never scheduled twice and permission is never asked twice for one booking.
 const attempts = new Map<string, Promise<ReminderStatus>>();
 
-async function runReminderSetup(booking: Booking, now: Date): Promise<ReminderStatus> {
+// The latest status each mounted confirmation screen has seen for its booking
+// (from the device store in mock mode, from Firestore in firebase mode). Used to
+// re-check, after the permission prompt, that the booking is still confirmed.
+const latestStatus = new Map<string, Booking['status']>();
+
+async function runReminderSetup(
+  booking: Booking,
+  isStillConfirmed: () => boolean,
+  now: Date,
+): Promise<ReminderStatus> {
   const plan = planBookingReminder(booking, now);
   if (plan.kind === 'too-late') {
     return { kind: 'too-late' };
@@ -44,8 +53,7 @@ async function runReminderSetup(booking: Booking, now: Date): Promise<ReminderSt
 
   // The permission prompt can stay open for a while; the booking may have been
   // cancelled meanwhile. Never keep a reminder for a cancelled booking.
-  const current = useBookingStore.getState().bookings.find((item) => item.id === booking.id);
-  if (current?.status !== 'confirmed') {
+  if (!isStillConfirmed()) {
     await cancelScheduledNotification(result.notificationId);
     return { kind: 'booking-cancelled' };
   }
@@ -61,13 +69,14 @@ async function runReminderSetup(booking: Booking, now: Date): Promise<ReminderSt
  */
 export function scheduleBookingReminder(
   booking: Booking,
+  isStillConfirmed: () => boolean = () => latestStatus.get(booking.id) !== 'cancelled',
   now: Date = new Date(),
 ): Promise<ReminderStatus> {
   const existing = attempts.get(booking.id);
   if (existing !== undefined) {
     return existing;
   }
-  const attempt = runReminderSetup(booking, now).catch((): ReminderStatus => ({
+  const attempt = runReminderSetup(booking, isStillConfirmed, now).catch((): ReminderStatus => ({
     kind: 'unavailable',
   }));
   attempts.set(booking.id, attempt);
@@ -78,6 +87,13 @@ export function scheduleBookingReminder(
 export function useBookingReminder(booking: Booking | undefined): ReminderStatus {
   const [status, setStatus] = useState<ReminderStatus>(PENDING);
   const shouldSchedule = booking !== undefined && booking.status === 'confirmed';
+
+  // Keep the latest seen status for the post-permission re-check (runs first).
+  useEffect(() => {
+    if (booking !== undefined) {
+      latestStatus.set(booking.id, booking.status);
+    }
+  }, [booking]);
 
   useEffect(() => {
     if (booking === undefined || !shouldSchedule) {

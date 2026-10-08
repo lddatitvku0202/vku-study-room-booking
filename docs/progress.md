@@ -1141,6 +1141,42 @@ Commit: `feat(bookings): add cancellation transaction and lock release`
 Known issues: none.
 Next task: 39R
 
+## 39R — QR and reminders bound to confirmed bookings
+
+Status: DONE
+Implemented:
+- **Reminder bug fixed (firebase mode):** after the permission prompt, the reminder setup
+  re-checked "still confirmed" by looking the booking up in the local store. Firebase
+  bookings are never in that store, so every firebase-mode reminder would have been
+  scheduled and immediately cancelled. `scheduleBookingReminder` now takes an
+  `isStillConfirmed` check fed by the status the confirmation screen actually holds (device
+  store in mock mode, Firestore in firebase mode).
+- Reminders are scheduled from the confirmation screen, which is only reached after the
+  booking transaction committed — i.e. only for a server-confirmed booking. The id stays
+  in `notificationIds` (device-local, AD-23); cancellation (35R) cancels it after the
+  server confirms.
+- **QR only for a confirmed booking:** `BookingSuccessScreen` withdraws the pass when the
+  booking is cancelled ("Booking pass withdrawn — this booking was cancelled."). With the
+  realtime My Bookings list (34R) this happens live, even with the screen open.
+- Payload unchanged: `bookingId | roomName | date | slotLabel`.
+Verification:
+  typecheck / lint / format → PASS
+  npm test → 121/121 (+5 reminder tests, notification service mocked): a confirmed
+    Firestore booking not in the local store keeps its reminder (regression test for the bug;
+    exact Vietnamese title/body, fire time start − 15 min); cancelled during the prompt →
+    reminder cancelled, nothing stored; too late → nothing scheduled; permission denied →
+    reported, nothing stored; same booking twice → scheduled once
+  Production, real UI: booking → QR pass with `<id> | Computer Lab V502 | <date> | 13:00 -
+    15:00`; cancelled as owner while the screen is open → "Booking cancelled" and the pass is
+    withdrawn in realtime; the web build's reminder notice degraded gracefully to
+    "Notifications are off" (headless browser, no permission); no page errors
+  Mock-mode browser regression → PASS
+Not verified: notification **delivery** on a physical device (scheduling API verified with
+a mocked module; physical delivery not verified). Expo Go on Android cannot load
+expo-notifications (MVP-06), so Android reminders need a development build.
+Commit: `feat(notifications): bind qr and reminders to confirmed bookings`
+Next task: 32R/33R
+
 ---
 
 ## Task log template
