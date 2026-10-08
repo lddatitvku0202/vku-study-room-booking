@@ -17,6 +17,7 @@ import {
   subscribeToSession as subscribeFor,
 } from '@/services/firebase/auth';
 import { createBookingTransaction } from '@/services/firebase/booking-transactions';
+import { fetchBookingDocument } from '@/services/firebase/bookings';
 import { fetchRoomCatalogue } from '@/services/firebase/rooms';
 import {
   listenToDateLocks,
@@ -25,6 +26,7 @@ import {
   type LockListener,
 } from '@/services/firebase/slot-locks';
 
+import type { Booking } from '@/types/booking';
 import type { Room } from '@/types/room';
 import type { UserSession } from '@/types/session';
 import type { BookingOutcome, BookingRequest } from '@/utils/booking-contract';
@@ -109,4 +111,10 @@ export function currentUserId(): string | undefined {
 export async function createBooking(request: BookingRequest): Promise<BookingOutcome> {
   const session = await ensureAnonymousSession();
   return createBookingTransaction(getFirebaseServices().db, session.uid, request);
+}
+
+/** One of the signed-in user's bookings (owner-only by the rules). */
+export async function fetchBooking(bookingId: string): Promise<Booking | null> {
+  await ensureAnonymousSession();
+  return fetchBookingDocument(getFirebaseServices().db, bookingId);
 }

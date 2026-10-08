@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, View, type ListRenderItem } from 'react-native';
 
 import { DateChip } from '@/components/DateChip';
@@ -16,13 +16,14 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { colors, radius, spacing } from '@/data/theme';
 import { TIME_SLOTS, type SlotId } from '@/data/time-slots';
 import { useRoom, useRooms } from '@/hooks/use-rooms';
+import { useCreateBooking } from '@/hooks/useCreateBooking';
 import { useDataSource } from '@/hooks/useDataSource';
 import { useNow } from '@/hooks/useNow';
 import { useRoomAvailability } from '@/hooks/useRoomAvailability';
 import { useRoomStatus } from '@/hooks/useRoomStatus';
-import { createDemoBookingId, reserveRoomDemo } from '@/services/bookingSimulator';
 import { useBookingStore, useBookingStoreHydrated } from '@/store/useBookingStore';
 import { getBookableDates, isSlotPast, toDateKey, type BookableDate } from '@/utils/booking-dates';
+import { bookingErrorText } from '@/utils/booking-messages';
 import { findConfirmedBooking } from '@/utils/booking-rules';
 import { findSimilarRooms } from '@/utils/similar-rooms';
 import { buildSlotKey } from '@/utils/slot-key';
@@ -61,14 +62,16 @@ function slotKeyOf(item: SlotItem): string {
 }
 
 /**
- * Room details, date and slot selection, and the local demo booking flow.
+ * Room details, date and slot selection, and booking.
  *
- * Booking: "Đặt phòng" → local checks (slot not started, not already booked) →
- * `reserveRoomDemo` (1–1.5 s, ~70% success / ~30% simulated conflict) → on success
- * the booking is saved through the store and only then does the app navigate to
- * BookingSuccess. On a conflict the slot is marked unavailable, the user stays
- * here, and alternatives are suggested. The conflict engine is a local demo
- * simulation — there is no multi-user synchronization in the MVP.
+ * Booking: "Đặt phòng" → local checks (slot not started, not already yours) →
+ * `useCreateBooking`:
+ * - mock mode: the MVP's local simulator (1–1.5 s, ~70% success / ~30% simulated
+ *   conflict, labelled as a simulation) and the device store;
+ * - firebase mode: the atomic Firestore transaction — the server decides the winner.
+ * Only after a confirmed success does the app navigate to BookingSuccess. On a
+ * conflict the slot is marked unavailable, the user stays here, and alternatives
+ * are suggested.
  */
 export function RoomDetailsScreen({
   route,
@@ -81,8 +84,9 @@ export function RoomDetailsScreen({
 
   const isFirebase = useDataSource() === 'firebase';
   const conflictedSlotKeys = useBookingStore((state) => state.conflictedSlotKeys);
-  const addBooking = useBookingStore((state) => state.addBooking);
+  const createBooking = useCreateBooking();
   const markSlotConflict = useBookingStore((state) => state.markSlotConflict);
+  const clearConflict = useBookingStore((state) => state.clearConflict);
   const isHydrated = useBookingStoreHydrated();
 
   const now = useNow();
@@ -103,6 +107,21 @@ export function RoomDetailsScreen({
   const takenKeys = availability.takenByOthers;
   const { statusOf } = useRoomStatus();
   const conflictedKeys = useMemo(() => new Set(conflictedSlotKeys), [conflictedSlotKeys]);
+
+  // Firebase mode: a conflict mark only covers the moment until the realtime lock
+  // arrives. Once the server's lock is visible it is the truth (AD-11), so the
+  // local mark is dropped — and when that lock is later released (the winner
+  // cancels), the slot becomes bookable again. Mock mode keeps the MVP behaviour.
+  useEffect(() => {
+    if (!isFirebase) {
+      return;
+    }
+    for (const key of conflictedSlotKeys) {
+      if (takenKeys.has(key) || bookedKeys.has(key)) {
+        clearConflict(key);
+      }
+    }
+  }, [isFirebase, conflictedSlotKeys, takenKeys, bookedKeys, clearConflict]);
 
   // A date is valid only while it is inside the 7-day window (it can fall out if
   // the screen stays open past midnight).
@@ -177,15 +196,6 @@ export function RoomDetailsScreen({
     if (inFlightRef.current || !canBook || room === undefined || selectedItem === undefined) {
       return;
     }
-    if (isFirebase) {
-      // Temporary until the Firestore booking transaction is wired (31R): firebase mode
-      // must never fall back to the local simulator (AD-38).
-      showDialog(
-        'Booking unavailable',
-        'Booking through Firebase is not enabled in this build yet.',
-      );
-      return;
-    }
     const { slot } = selectedItem;
     const date = selectedDate;
 
@@ -196,7 +206,10 @@ export function RoomDetailsScreen({
       return;
     }
     const slotKey = buildSlotKey(room.id, date, slot.id);
-    if (findConfirmedBooking(useBookingStore.getState().bookings, slotKey) !== undefined) {
+    const alreadyMine = isFirebase
+      ? bookedKeys.has(slotKey)
+      : findConfirmedBooking(useBookingStore.getState().bookings, slotKey) !== undefined;
+    if (alreadyMine) {
       showDialog('Already booked', 'You already have a confirmed booking for this time slot.');
       return;
     }
@@ -204,7 +217,8 @@ export function RoomDetailsScreen({
     inFlightRef.current = true;
     setIsSubmitting(true);
     try {
-      const result = await reserveRoomDemo({ bookingId: createDemoBookingId(), room, date, slot });
+      // Mock: local simulator. Firebase: the atomic Firestore transaction (31R).
+      const result = await createBooking({ room, date, slot });
 
       if (result.kind === 'conflict') {
         markSlotConflict(result.slotKey);
@@ -221,10 +235,16 @@ export function RoomDetailsScreen({
         ]);
         return;
       }
-
-      // Local duplicate prevention: the store refuses a slot that is already taken.
-      if (addBooking(result.booking) === 'duplicate') {
+      if (result.kind === 'duplicate') {
         showDialog('Already booked', 'You already have a confirmed booking for this time slot.');
+        return;
+      }
+      if (result.kind === 'error') {
+        if (result.code === 'PAST_SLOT') {
+          setSelectedSlotId(null);
+        }
+        const text = bookingErrorText(result.code);
+        showDialog(text.title, text.message);
         return;
       }
 
@@ -241,7 +261,8 @@ export function RoomDetailsScreen({
     room,
     selectedItem,
     selectedDate,
-    addBooking,
+    bookedKeys,
+    createBooking,
     markSlotConflict,
     navigation,
   ]);
@@ -369,8 +390,9 @@ export function RoomDetailsScreen({
     <View style={styles.alternatives}>
       <AppText variant="heading">Alternatives</AppText>
       <AppText variant="caption" color="textSecondary">
-        Demo mode: this conflict was simulated (about 30% of attempts). No other user booked this
-        room.
+        {isFirebase
+          ? 'Another booking for this slot was confirmed by the server first.'
+          : 'Demo mode: this conflict was simulated (about 30% of attempts). No other user booked this room.'}
       </AppText>
 
       {alternativeSlots.length > 0 ? (

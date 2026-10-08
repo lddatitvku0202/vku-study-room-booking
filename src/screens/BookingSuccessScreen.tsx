@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, View } from 'react-native';
 
 import { BookingPass } from '@/components/BookingPass';
 import { ReminderNotice } from '@/components/ReminderNotice';
@@ -11,8 +11,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { FadeIn } from '@/components/ui/FadeIn';
 import { Screen } from '@/components/ui/Screen';
 import { colors, spacing } from '@/data/theme';
+import { useBooking } from '@/hooks/useBooking';
 import { useBookingReminder } from '@/hooks/useBookingReminder';
-import { useBookingStore } from '@/store/useBookingStore';
+import { useDataSource } from '@/hooks/useDataSource';
 import { buildBookingPassPayload } from '@/utils/booking-pass';
 
 import type { RootStackScreenProps } from '@/navigation/types';
@@ -47,7 +48,7 @@ function openAppSettings(): void {
 
 /**
  * Shown after a booking is saved. Receives only `bookingId`, reads the booking
- * from the local demo store, shows the QR booking pass, and sets up the local
+ * (mock: the device store; firebase: Firestore), shows the QR booking pass, and sets up the local
  * reminder (start − 15 min).
  */
 export function BookingSuccessScreen({
@@ -55,7 +56,8 @@ export function BookingSuccessScreen({
   navigation,
 }: RootStackScreenProps<'BookingSuccess'>): JSX.Element {
   const { bookingId } = route.params;
-  const booking = useBookingStore((state) => state.bookings.find((b) => b.id === bookingId));
+  const isFirebase = useDataSource() === 'firebase';
+  const { booking, isLoading } = useBooking(bookingId);
   const reminder = useBookingReminder(booking);
   const passPayload = useMemo(
     () => (booking === undefined ? '' : buildBookingPassPayload(booking)),
@@ -68,6 +70,17 @@ export function BookingSuccessScreen({
   const viewMyBookings = useCallback(() => {
     navigation.popTo('MainTabs', { screen: 'MyBookings' });
   }, [navigation]);
+
+  if (booking === undefined && isLoading) {
+    return (
+      <Screen edges={SCREEN_EDGES}>
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.primary} />
+          <AppText color="textSecondary">Loading your booking…</AppText>
+        </View>
+      </Screen>
+    );
+  }
 
   if (booking === undefined) {
     return (
@@ -119,8 +132,9 @@ export function BookingSuccessScreen({
         {isConfirmed && <ReminderNotice status={reminder} onOpenSettings={openAppSettings} />}
 
         <AppText variant="caption" color="textSecondary" style={styles.centered}>
-          Demo booking saved on this device only — it is not synchronized with other users. The QR
-          pass is for display; nothing scans it.
+          {isFirebase
+            ? 'Confirmed by the server — other users now see this slot as booked. The QR pass is for display; nothing scans it.'
+            : 'Demo booking saved on this device only — it is not synchronized with other users. The QR pass is for display; nothing scans it.'}
         </AppText>
 
         <View style={styles.actions}>
@@ -133,6 +147,12 @@ export function BookingSuccessScreen({
 }
 
 const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
   content: {
     padding: spacing.md,
     gap: spacing.md,

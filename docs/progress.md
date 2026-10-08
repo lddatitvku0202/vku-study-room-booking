@@ -1034,6 +1034,49 @@ Commit: `feat(security): enforce booking transaction invariants`
 Known issues: none.
 Next task: 31R
 
+## 31R — Booking mutation and conflict UX (firebase mode live)
+
+Status: DONE
+Implemented:
+- `hooks/useCreateBooking.ts` — mock: the MVP simulator + device store (unchanged);
+  firebase: `createBooking` → `runTransaction` (29R). One booking id per attempt, reused
+  if the same slot is retried after a network/unconfirmed/unknown failure (I6); no
+  optimistic success — the result arrives only after Firestore committed or refused (I4).
+  A success seeds the booking's query-cache entry.
+- `hooks/useBooking.ts` + `services/firebase/bookings.ts` — the confirmation screen reads
+  the booking from the store (mock) or Firestore (firebase, owner-only, revalidated).
+- `utils/booking-messages.ts` (pure) — user text for every typed error code.
+- `RoomDetailsScreen` — submit goes through `useCreateBooking`; double-tap guard, loading
+  button and the exact conflict copy ("Đặt phòng không thành công" / "Rất tiếc, phòng này
+  vừa được người khác đặt thành công.") are unchanged; conflicted slot disabled;
+  alternatives kept; typed error dialogs. The temporary firebase-mode refusal is removed.
+  Alternatives caption: mock → the simulation notice; firebase → "Another booking for this
+  slot was confirmed by the server first."
+- `BookingSuccessScreen` — `useBooking`, loading state, caption per mode ("Confirmed by
+  the server — other users now see this slot as booked" in firebase mode).
+- Bug found by the production UI test and fixed: in firebase mode the loser's local
+  conflict mark outlived the winner's lock, so after the winner cancelled the slot stayed
+  "Unavailable". The mark now only bridges the gap until the realtime lock arrives; once
+  the server's lock is visible it is the truth (AD-11) and the mark is cleared. Mock mode
+  keeps the MVP behaviour.
+Verification:
+  typecheck / lint / format → PASS; npm test → 116/116 (+14 message tests)
+  **Two-client race through the real UI on production** (two browser profiles = two
+  anonymous users, same room/date/slot, both press "Đặt phòng" at the same moment):
+    exactly one winner and one loser (settled in 1.5–1.9 s over two runs); the loser sees
+    the exact Vietnamese title and message, the slot disabled, Alternatives with the
+    server-conflict caption, then the slot "Booked" via realtime; the winner sees the
+    confirmation with QR payload `<id> | Computer Lab V506 | <date> | 15:00 - 17:00` and the
+    server caption; the loser does not see it as their own; cleanup: the winner cancels as
+    owner (coupled commit through the rules, HTTP 200) and the loser's grid shows the slot
+    Available again in realtime. The only console error is the expected HTTP 409 of the
+    loser's contended commit (Firestore aborted it; the retry then saw the lock).
+  Mock-mode browser regression → PASS
+Commit: `feat(booking): wire firestore booking mutation and conflict UX`
+Known issues: My Bookings and cancellation in firebase mode come in 34R/35R; reminders in
+firebase mode are bound to confirmed bookings in 39R.
+Next task: 34R
+
 ---
 
 ## Task log template
