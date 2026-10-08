@@ -10,6 +10,7 @@ import { Screen } from '@/components/ui/Screen';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { spacing } from '@/data/theme';
 import { useRooms } from '@/hooks/use-rooms';
+import { useDataSource } from '@/hooks/useDataSource';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useBookingStore } from '@/store/useBookingStore';
 import { getMockRoomStatus } from '@/utils/mock-room-status';
@@ -64,6 +65,7 @@ function equipmentLabel(item: Equipment): string {
  */
 export function BrowseRoomsScreen({ navigation }: MainTabScreenProps<'BrowseRooms'>): JSX.Element {
   const { data: rooms, isPending, isError, refetch } = useRooms();
+  const dataSource = useDataSource();
 
   // One selector per field: each returns a primitive or a stable array reference,
   // so the screen re-renders only when a criterion it uses actually changes.
@@ -151,7 +153,9 @@ export function BrowseRoomsScreen({ navigation }: MainTabScreenProps<'BrowseRoom
       <View style={styles.header}>
         <AppText variant="title">Study Rooms</AppText>
         <AppText variant="caption" color="textSecondary">
-          Demo data · status is a preview, not live occupancy
+          {dataSource === 'firebase'
+            ? 'Rooms from Firestore · status is a preview, not live occupancy'
+            : 'Demo data · status is a preview, not live occupancy'}
         </AppText>
 
         <AppInput

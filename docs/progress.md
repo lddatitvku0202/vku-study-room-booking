@@ -879,6 +879,33 @@ Known issues: the production path depends on a logged-in global Firebase CLI (or
 Application Default Credentials and extend the script).
 Next task: 12R
 
+## 12R — Rooms from Firestore behind the switch
+
+Status: DONE
+Implemented:
+- `services/firebase/rooms.ts` — `fetchRoomCatalogue(db)`: reads `rooms`, validates each
+  document with `roomFromDocument`, skips (and reports) malformed ones, sorts by id (the
+  catalogue's own order).
+- `services/firebase/index.ts` — `fetchRooms()`: ensures the anonymous session (rules need a
+  signed-in user), then reads the catalogue.
+- `services/room-repository.ts` — `fetchRooms()` returns `MOCK_ROOMS` in mock mode and the
+  Firestore catalogue (through `loadFirebaseBackend()`) in firebase mode. `useRooms`,
+  `useRoom`, the `['rooms']` cache, filtering and `BrowseRoomsScreen`'s list are unchanged.
+- `hooks/useDataSource.ts`; the Browse subtitle says "Rooms from Firestore · status is a
+  preview…" in firebase mode (the status label itself becomes live in 26R).
+Verification:
+  typecheck / lint → PASS
+  npm run test:rules → 48/48 (+2): 120 seeded rooms read back identical to the catalogue and
+    in the same order, a malformed document skipped; refused without a signed-in user
+  Browser, firebase mode, production project: subtitle "Rooms from Firestore", "120 of 120
+    rooms", 3 Firestore requests, search "B2" → 6, Room Details for B205 opens, no page errors
+  Browser, mock mode: "Demo data …" subtitle, renders, only picsum.photos contacted
+Test-harness note: the browser harness waited for "network idle", which never happens in
+firebase mode because Firestore keeps a streaming connection open; it now waits for page load.
+Commit: `feat(rooms): read rooms from firestore behind data-source flag`
+Known issues: none.
+Next task: 26R
+
 ---
 
 ## Task log template

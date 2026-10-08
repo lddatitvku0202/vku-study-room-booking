@@ -16,7 +16,9 @@ import {
   sessionErrorCodeOf,
   subscribeToSession as subscribeFor,
 } from '@/services/firebase/auth';
+import { fetchRoomCatalogue } from '@/services/firebase/rooms';
 
+import type { Room } from '@/types/room';
 import type { UserSession } from '@/types/session';
 
 export { getFirebaseServices, sessionErrorCodeOf };
@@ -28,4 +30,14 @@ export function ensureAnonymousSession(): Promise<UserSession> {
 
 export function subscribeToSession(listener: (session: UserSession | null) => void): () => void {
   return subscribeFor(getFirebaseServices().auth, listener);
+}
+
+/** The room catalogue from Firestore (rules require a signed-in user). */
+export async function fetchRooms(): Promise<readonly Room[]> {
+  await ensureAnonymousSession();
+  const { rooms, skipped } = await fetchRoomCatalogue(getFirebaseServices().db);
+  if (skipped.length > 0 && __DEV__) {
+    console.warn(`[rooms] skipped ${skipped.length} malformed room document(s):`, skipped);
+  }
+  return rooms;
 }
