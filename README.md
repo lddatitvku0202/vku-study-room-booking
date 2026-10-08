@@ -11,6 +11,36 @@ availability and conflict-free booking across users, on Firebase's free Spark pl
   * **Android build (firebase mode):** EAS preview APK — see [Mobile build](#mobile-build-eas).
 - Video: https://youtu.be/pB-orcaNmTw
 
+## Download the Android app (APK)
+
+Installable Android build of the **Firebase realtime** version (production project, anonymous
+sign-in, realtime availability, transactional booking):
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/android-apk-qr.png" width="200" alt="QR code: download the Android APK"><br>Scan with the phone camera</td>
+    <td>
+      <b><a href="https://expo.dev/artifacts/eas/2m3iD_DNaqjx9G6UfvYGNXhIiBsU66qY36O0Nh7bZ5o.apk">Download the APK (≈ 88 MB)</a></b><br><br>
+      Build page: <a href="https://expo.dev/accounts/lddatitvku0202/projects/vku-study-room-booking/builds/64ba3da7-ba6f-4b60-95a0-68b8c79e5f7d">EAS build 64ba3da7…</a> (Expo login required)<br>
+      Built from commit <code>e4673ca</code>, Android, <code>preview</code> profile, version 1.0.0.
+    </td>
+  </tr>
+</table>
+
+**How to install:** open the link (or scan the QR) on an Android phone, download the APK and
+open it. Android will ask to allow installing apps from this source (browser or Files) — allow
+it once. Then open **VKU Study Room Booking**. On Android 13+ the app asks for notification
+permission when a booking's reminder is set; it works if you decline.
+
+**To see the realtime conflict handling**, install it on two phones and book the same room,
+date and time slot on both at the same moment: one booking is confirmed and the other gets the
+conflict message. (The [Cloudflare web demo](https://vku-study-room-booking-7i4.pages.dev/) is
+the local mock version, so it cannot show this.)
+
+**Note:** EAS keeps build download links for a limited time (about 30 days on the free plan).
+If the link no longer works, the app can be rebuilt with `npx eas-cli build -p android
+--profile preview` (see [Mobile build](#mobile-build-eas)) or run in Expo Go in mock mode.
+
 ## Two data sources
 
 The app runs on one of two data sources, chosen by `DATA_SOURCE` in `.env` (decision AD-37):
