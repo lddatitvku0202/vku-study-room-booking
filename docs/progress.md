@@ -850,6 +850,35 @@ Commit: `feat(security): add firestore rules and emulator tests`
 Known issues: two throwaway anonymous users exist in production from the auth probes.
 Next task: 10R
 
+## 10R — Idempotent room seed
+
+Status: DONE
+Implemented:
+- `scripts/seed-rooms.ts` (`npm run seed:rooms -- --emulator | --production [--dry-run]`):
+  writes `rooms/{roomId}` from the MVP's deterministic generator (`src/data/rooms.ts`, same
+  ids) via `roomToDocument`. Each document is replaced with exactly the catalogue data, so
+  re-runs are no-ops; it reports created / updated / unchanged and lists (never deletes)
+  any extra room documents. Production target is only the `.firebaserc` default project;
+  the emulator run refuses nothing but uses the `demo-` project.
+- **Credentials, no private key:** the Firestore REST API with the emulator's `owner` token,
+  or — for production — a short-lived access token minted in memory from the developer's
+  own Firebase CLI login (refresh token from the CLI's config store, the CLI's public OAuth
+  client read from the installed firebase-tools). Never printed or written. (A first
+  attempt with the Admin SDK was dropped: its Firestore client only accepts a
+  service-account key or Application Default Credentials.)
+- `tsx` (dev) runs the script. TypeScript 6 no longer loads `@types/*` globally, so
+  `scripts/tsconfig.json` adds Node types for `scripts/` only (the app code stays free of
+  Node globals); `npm run typecheck` now checks both projects.
+Verification:
+  typecheck (app + scripts) / lint / format → PASS
+  Emulator: run 1 → created 120; run 2 → unchanged 120; dry run → unchanged 120; count 120
+  Production `vku-study-room-booking`: dry run → would create 120 (0 present); run 1 →
+    created 120; run 2 → created 0, updated 0, unchanged 120; rooms in Firestore: 120
+Commit: `feat(data): add idempotent firestore room seed`
+Known issues: the production path depends on a logged-in global Firebase CLI (or set up
+Application Default Credentials and extend the script).
+Next task: 12R
+
 ---
 
 ## Task log template
