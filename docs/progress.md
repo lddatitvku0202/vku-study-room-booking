@@ -949,6 +949,32 @@ Known issues: listeners are not yet detached while the app is backgrounded (PLAN
 similar-room suggestions only know the current room's live locks.
 Next task: 28R
 
+## 28R — Pure booking transaction contract
+
+Status: DONE
+Implemented: `src/utils/booking-contract.ts` (no Firebase, no React):
+- `BookingErrorCode` — the single source of booking/cancellation error codes (`SLOT_TAKEN`,
+  `INVALID_SLOT`, `PAST_SLOT`, `OUTSIDE_WINDOW`, `BOOKING_ID_CONFLICT`, `UNAUTHENTICATED`,
+  `PERMISSION_DENIED`, `NETWORK`, `UNCONFIRMED`, `NOT_FOUND`, `NOT_OWNER`,
+  `ALREADY_CANCELLED`, `UNKNOWN`); `BookingRequest`; `BookingOutcome`
+  (`success` {booking, replayed} | `conflict` {slotKey} | `error` {code}).
+- `validateBookingRequest` — one of the four slots, a real date, not started (start minute
+  counts as started), inside the 7-day window; returns the derived `slotKey`.
+- `createBookingId` — 20 alphanumerics, generated once per attempt and reused on retries
+  (I6); randomness only makes ids unique, it never decides an outcome. `isBookingId`.
+- `decideBookingOutcome(existing lock/booking, request)` → `PROCEED` | `IDEMPOTENT_SUCCESS`
+  (the lock is this same attempt's: same id and same user) | `SLOT_TAKEN` |
+  `BOOKING_ID_CONFLICT` (never overwrite history).
+- `decideCancellation` → `PROCEED` | `NOT_FOUND` | `NOT_OWNER` | `ALREADY_CANCELLED` |
+  `PAST_SLOT`; `mapFirestoreErrorCode`.
+Verification: typecheck / lint → PASS; npm test → 102/102 (+30 contract tests: window edges
+today+6 / today+7, start minute, unknown slot, malformed and impossible dates; id shape,
+uniqueness over 2000 ids; every decision branch including "same id but another user's
+lock"; every cancellation branch; error mapping).
+Commit: `feat(booking): add booking transaction contract`
+Known issues: none.
+Next task: 29R
+
 ---
 
 ## Task log template
