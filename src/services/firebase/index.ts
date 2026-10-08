@@ -16,7 +16,10 @@ import {
   sessionErrorCodeOf,
   subscribeToSession as subscribeFor,
 } from '@/services/firebase/auth';
-import { createBookingTransaction } from '@/services/firebase/booking-transactions';
+import {
+  cancelBookingTransaction,
+  createBookingTransaction,
+} from '@/services/firebase/booking-transactions';
 import { fetchBookingDocument, listenToUserBookings } from '@/services/firebase/bookings';
 import { fetchRoomCatalogue } from '@/services/firebase/rooms';
 import {
@@ -29,7 +32,7 @@ import {
 import type { Booking } from '@/types/booking';
 import type { Room } from '@/types/room';
 import type { UserSession } from '@/types/session';
-import type { BookingOutcome, BookingRequest } from '@/utils/booking-contract';
+import type { BookingOutcome, BookingRequest, CancelOutcome } from '@/utils/booking-contract';
 
 export { getFirebaseServices, sessionErrorCodeOf };
 
@@ -132,4 +135,10 @@ export function subscribeToMyBookings(
     }
     return listenToUserBookings(getFirebaseServices().db, uid, onNext, onError);
   }, onError);
+}
+
+/** Cancels one of the signed-in user's bookings and releases its lock atomically. */
+export async function cancelBooking(bookingId: string): Promise<CancelOutcome> {
+  const session = await ensureAnonymousSession();
+  return cancelBookingTransaction(getFirebaseServices().db, session.uid, bookingId);
 }

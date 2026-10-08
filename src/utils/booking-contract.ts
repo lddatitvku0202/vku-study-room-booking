@@ -69,6 +69,11 @@ export type BookingOutcome =
   | { readonly kind: 'conflict'; readonly slotKey: string }
   | { readonly kind: 'error'; readonly code: BookingErrorCode };
 
+/** The result of a cancellation attempt. */
+export type CancelOutcome =
+  | { readonly kind: 'cancelled'; readonly bookingId: string }
+  | { readonly kind: 'error'; readonly code: BookingErrorCode };
+
 export type RequestValidation =
   | { readonly ok: true; readonly slot: TimeSlot; readonly slotKey: string }
   | { readonly ok: false; readonly code: 'INVALID_SLOT' | 'PAST_SLOT' | 'OUTSIDE_WINDOW' };

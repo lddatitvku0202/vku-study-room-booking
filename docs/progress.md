@@ -1106,6 +1106,41 @@ Commit: `feat(bookings): read user bookings from firestore`
 Known issues: none beyond 35R scope.
 Next task: 35R
 
+## 35R — Cancellation transaction and lock release
+
+Status: DONE
+Implemented:
+- `cancelBookingTransaction(db, uid, bookingId)` (`services/firebase/booking-transactions.ts`):
+  one `runTransaction` — read the booking (and its lock) → `decideCancellation` (owner,
+  still confirmed, slot not started) → `status = 'cancelled'` with server timestamps **and**
+  delete `slotLocks/{slotKey}` in the same commit (I7). Typed `CancelOutcome`
+  (`utils/booking-contract.ts`). Rules (09R) already refuse a bare lock delete, a
+  cancellation without the release, and any non-owner.
+- `services/firebase/index.ts` — `cancelBooking(bookingId)`.
+- `hooks/useCancelBooking.ts` — now async and typed for both modes. Mock: the MVP's local
+  cancel. Firebase: the transaction; the local reminder is cancelled only **after** the
+  server confirmed, via the new store action `takeNotificationId` (device-local client
+  state, never the booking authority).
+- `MyBookingsScreen` — shows a typed error dialog if a cancellation fails.
+Verification:
+  typecheck / lint / format → PASS; npm test → 116/116
+  npm run test:rules → 79/79 (+7): cancel releases the lock in one commit and keeps history
+    (`cancelledAt` set); another user books the released slot immediately; another user
+    cannot cancel (PERMISSION_DENIED, booking unchanged); twice → ALREADY_CANCELLED; unknown
+    → NOT_FOUND; started slot → PAST_SLOT before any write; a seeded past booking is also
+    refused by the rules when the client clock is wrong; concurrent cancel + re-book over 5
+    rounds never leaves two confirmed bookings or a lock without a confirmed booking.
+    (One first-run failure was a test bug — round 5 reused round 1's slot, which round 1 had
+    legitimately left booked; each round now uses its own date.)
+  **Production, real UI, both users using only the app** (two browser profiles): A books
+    Computer Lab V503 → B sees "Booked" → A cancels in My Bookings after the confirm dialog
+    (Confirmed (0)) → B sees the slot Available in realtime 555 ms after A's tap → B books the
+    released slot → B cancels (cleanup); no page errors
+  Mock-mode browser regression → PASS
+Commit: `feat(bookings): add cancellation transaction and lock release`
+Known issues: none.
+Next task: 39R
+
 ---
 
 ## Task log template

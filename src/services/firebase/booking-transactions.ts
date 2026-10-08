@@ -19,17 +19,20 @@ import { doc, getDoc, runTransaction, type Firestore } from 'firebase/firestore'
 
 import {
   bookingFromDocument,
+  cancellationUpdate,
   COLLECTIONS,
   newBookingDocument,
   newSlotLockDocument,
 } from '@/services/firebase/model';
 import {
   decideBookingOutcome,
+  decideCancellation,
   mapFirestoreErrorCode,
   validateBookingRequest,
   type BookingDecision,
   type BookingOutcome,
   type BookingRequest,
+  type CancelOutcome,
   type ExistingState,
 } from '@/utils/booking-contract';
 import { errorCodeOf } from '@/utils/firebase-errors';
@@ -180,6 +183,49 @@ async function resolveAfterAbort(
           replayed: true,
         }
       : { kind: 'conflict', slotKey };
+  } catch (error: unknown) {
+    return { kind: 'error', code: mapFirestoreErrorCode(errorCodeOf(error)) };
+  }
+}
+
+/**
+ * Cancels a booking and releases its slot lock in ONE transaction (35R, I7):
+ * read the booking (and its lock) → `decideCancellation` (owner, still confirmed,
+ * slot not started) → set status cancelled with server timestamps and delete the
+ * lock in the same commit. The rules refuse a lock release without this coupled
+ * cancellation, and a cancellation by anyone but the owner.
+ */
+export async function cancelBookingTransaction(
+  db: Firestore,
+  uid: string,
+  bookingId: string,
+  now: Date = new Date(),
+): Promise<CancelOutcome> {
+  const bookingRef = doc(db, COLLECTIONS.bookings, bookingId);
+  try {
+    const decision = await runTransaction(db, async (tx) => {
+      const bookingSnapshot = await tx.get(bookingRef);
+      const booking = bookingSnapshot.exists()
+        ? bookingFromDocument(
+            bookingSnapshot.id,
+            bookingSnapshot.data({ serverTimestamps: 'estimate' }),
+          )
+        : null;
+      const outcome = decideCancellation(booking, uid, now);
+      if (outcome !== 'PROCEED' || booking === null) {
+        return outcome;
+      }
+      const lockRef = doc(db, COLLECTIONS.slotLocks, booking.slotKey);
+      const lockSnapshot = await tx.get(lockRef);
+      tx.update(bookingRef, { ...cancellationUpdate() });
+      if (lockSnapshot.exists() && text(lockSnapshot.data(), 'bookingId') === bookingId) {
+        tx.delete(lockRef);
+      }
+      return outcome;
+    });
+    return decision === 'PROCEED'
+      ? { kind: 'cancelled', bookingId }
+      : { kind: 'error', code: decision };
   } catch (error: unknown) {
     return { kind: 'error', code: mapFirestoreErrorCode(errorCodeOf(error)) };
   }

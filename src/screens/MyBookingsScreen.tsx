@@ -12,6 +12,7 @@ import { useCancelBooking } from '@/hooks/useCancelBooking';
 import { useDataSource } from '@/hooks/useDataSource';
 import { useMyBookings } from '@/hooks/useMyBookings';
 import { countBookingsByStatus, getBookingsByStatus } from '@/utils/booking-list';
+import { bookingErrorText } from '@/utils/booking-messages';
 
 import type { MainTabScreenProps } from '@/navigation/types';
 import type { Booking, BookingStatus } from '@/types/booking';
@@ -82,7 +83,12 @@ export function MyBookingsScreen({ navigation }: MainTabScreenProps<'MyBookings'
             text: 'Cancel booking',
             style: 'destructive',
             onPress: () => {
-              cancelBooking(booking.id);
+              void cancelBooking(booking.id).then((outcome) => {
+                if (outcome.kind === 'error') {
+                  const text = bookingErrorText(outcome.code);
+                  showDialog(text.title, text.message);
+                }
+              });
             },
           },
         ],

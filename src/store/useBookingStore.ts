@@ -59,6 +59,11 @@ export interface BookingStoreState {
   readonly cancelBooking: (bookingId: string) => CancelBookingResult;
   /** Records the reminder scheduled for a booking. */
   readonly setBookingNotificationId: (bookingId: string, notificationId: string) => void;
+  /**
+   * Removes and returns a booking's reminder id (firebase mode: called after the
+   * server confirmed the cancellation). Device-local client state only.
+   */
+  readonly takeNotificationId: (bookingId: string) => string | undefined;
   readonly markSlotConflict: (slotKey: string) => void;
   readonly clearConflict: (slotKey: string) => void;
 
@@ -178,6 +183,19 @@ export const useBookingStore = create<BookingStoreState>()(
           notificationIds: remainingNotificationIds,
         });
         return { kind: 'cancelled', booking: cancelled, notificationId };
+      },
+
+      takeNotificationId: (bookingId) => {
+        const { notificationIds } = get();
+        const notificationId = notificationIds[bookingId];
+        if (notificationId !== undefined) {
+          set({
+            notificationIds: Object.fromEntries(
+              Object.entries(notificationIds).filter(([id]) => id !== bookingId),
+            ),
+          });
+        }
+        return notificationId;
       },
 
       setBookingNotificationId: (bookingId, notificationId) => {
