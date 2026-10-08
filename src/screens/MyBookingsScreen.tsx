@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 
 import { BookingCard } from '@/components/BookingCard';
 import { FilterChip } from '@/components/FilterChip';
 import { AppText } from '@/components/ui/AppText';
+import { showDialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Screen } from '@/components/ui/Screen';
 import { colors, spacing } from '@/data/theme';
@@ -69,7 +70,7 @@ export function MyBookingsScreen({ navigation }: MainTabScreenProps<'MyBookings'
 
   const confirmCancel = useCallback(
     (booking: Booking) => {
-      Alert.alert(
+      showDialog(
         'Cancel this booking?',
         `${booking.roomName}\n${booking.date} · ${booking.slotLabel}\n\n` +
           'The time slot becomes available again. The booking stays in your history as cancelled.',

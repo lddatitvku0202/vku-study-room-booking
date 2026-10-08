@@ -662,6 +662,31 @@ Commit: `docs(progress): record post-MVP baseline and Firebase resume decisions`
 Known issues: none.
 Next task: W1
 
+## W1 — Web confirmations and notices
+
+Status: DONE
+Implemented: `src/components/ui/dialog.ts` — `showDialog(title, message?, buttons?)`. Native:
+exactly `Alert.alert`. Web: react-native-web's `Alert.alert` is an empty function
+(`node_modules/react-native-web/dist/exports/Alert/index.js`), so the helper uses the
+browser's `confirm()` when there is a cancel button plus an action (OK runs the action,
+Cancel the cancel button; the text names both) and `alert()` otherwise, then runs the
+first button's `onPress`. All five `Alert.alert` call sites (conflict notice, "slot has
+started", two "already booked" notices, cancel confirmation) now call `showDialog`; copy,
+buttons and business logic are unchanged.
+Verification:
+  npm run typecheck / npm run lint → PASS
+  npx expo export --platform web → PASS (exported to a scratch folder, not `dist/`)
+  Real browser (headless Microsoft Edge driving the exported web build, mock mode) → 9/9:
+    conflict notice appears as a browser alert with the exact Vietnamese title and message;
+    the slot then shows "Unavailable" and Alternatives are visible; a success was also seen;
+    "Cancel booking" opens a confirm; dismissing keeps the booking; accepting moves it to
+    Cancelled (4 → 3 confirmed, 1 cancelled).
+Commit: `fix(web): make confirmations and alerts work on react-native-web`
+Known issues: the browser dialog cannot show custom button labels, so the confirm text says
+"OK: Cancel booking · Cancel: Keep booking". Native was not re-run on a device (the native
+branch is the unchanged `Alert.alert` call).
+Next task: 06R
+
 ---
 
 ## Task log template

@@ -1,13 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  Image,
-  Pressable,
-  StyleSheet,
-  View,
-  type ListRenderItem,
-} from 'react-native';
+import { FlatList, Image, Pressable, StyleSheet, View, type ListRenderItem } from 'react-native';
 
 import { DateChip } from '@/components/DateChip';
 import { FilterChip } from '@/components/FilterChip';
@@ -17,6 +9,7 @@ import { AppButton } from '@/components/ui/AppButton';
 import { AppText } from '@/components/ui/AppText';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
+import { showDialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Screen } from '@/components/ui/Screen';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -181,12 +174,12 @@ export function RoomDetailsScreen({
     // Re-check with fresh data right before sending.
     if (isSlotPast(date, slot, new Date())) {
       setSelectedSlotId(null);
-      Alert.alert('Time slot has started', 'Please choose a later time slot.');
+      showDialog('Time slot has started', 'Please choose a later time slot.');
       return;
     }
     const slotKey = buildSlotKey(room.id, date, slot.id);
     if (findConfirmedBooking(useBookingStore.getState().bookings, slotKey) !== undefined) {
-      Alert.alert('Already booked', 'You already have a confirmed booking for this time slot.');
+      showDialog('Already booked', 'You already have a confirmed booking for this time slot.');
       return;
     }
 
@@ -199,7 +192,7 @@ export function RoomDetailsScreen({
         markSlotConflict(result.slotKey);
         setSelectedSlotId(null);
         setConflict({ date, slotId: slot.id });
-        Alert.alert(CONFLICT_TITLE, CONFLICT_MESSAGE, [
+        showDialog(CONFLICT_TITLE, CONFLICT_MESSAGE, [
           {
             text: CONFLICT_ACTION,
             onPress: () => {
@@ -213,7 +206,7 @@ export function RoomDetailsScreen({
 
       // Local duplicate prevention: the store refuses a slot that is already taken.
       if (addBooking(result.booking) === 'duplicate') {
-        Alert.alert('Already booked', 'You already have a confirmed booking for this time slot.');
+        showDialog('Already booked', 'You already have a confirmed booking for this time slot.');
         return;
       }
 
