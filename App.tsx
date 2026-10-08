@@ -10,6 +10,7 @@ import { colors } from '@/data/theme';
 import { useNotificationSetup } from '@/hooks/useNotificationSetup';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { QueryProvider } from '@/providers/QueryProvider';
+import { SessionProvider } from '@/providers/SessionProvider';
 
 import type { JSX } from 'react';
 
@@ -31,7 +32,7 @@ const navigationTheme: Theme = {
  * Application root.
  *
  * Provider order, outermost first: safe-area insets, the server-state cache,
- * then navigation. EMERGENCY MVP — see docs/progress.md.
+ * the session (anonymous sign-in in firebase mode, AD-36), then navigation.
  */
 export default function App(): JSX.Element {
   useNotificationSetup();
@@ -39,10 +40,12 @@ export default function App(): JSX.Element {
   return (
     <SafeAreaProvider>
       <QueryProvider>
-        <NavigationContainer theme={navigationTheme}>
-          <RootNavigator />
-        </NavigationContainer>
-        <StatusBar style="dark" />
+        <SessionProvider>
+          <NavigationContainer theme={navigationTheme}>
+            <RootNavigator />
+          </NavigationContainer>
+          <StatusBar style="dark" />
+        </SessionProvider>
       </QueryProvider>
     </SafeAreaProvider>
   );

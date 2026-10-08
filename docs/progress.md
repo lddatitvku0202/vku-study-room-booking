@@ -733,6 +733,42 @@ Commit: `feat(firebase): add lazy firebase foundation behind data-source flag`
 Known issues: none blocking. Anonymous sign-in is 08R; rules are a deny-all placeholder.
 Next task: 08R
 
+## 08R — Anonymous Firebase session
+
+Status: DONE
+Implemented:
+- `services/firebase/auth.ts` — `ensureAnonymousSession(auth)` (restores a persisted user,
+  otherwise `signInAnonymously`; one shared in-flight sign-in per Auth instance so
+  concurrent callers never create two users; a failure clears it so the next call
+  retries), `subscribeToSession`, `currentUid`, typed `SessionError`. Functions take the
+  `Auth` instance as a parameter so they run unchanged against the emulator.
+- `services/firebase/index.ts` binds them to the app's lazily created Auth.
+- `utils/firebase-errors.ts` (pure) — Firebase error code → `SessionErrorCode`
+  (`NETWORK`, `ANONYMOUS_AUTH_DISABLED`, `TOO_MANY_REQUESTS`, `UNKNOWN`).
+- `types/session.ts` — `UserSession { uid, isAnonymous }`, `SessionState`
+  (`disabled` in mock mode | `loading` | `signed-in` | `error`).
+- `hooks/useSession.ts` + `providers/SessionProvider.tsx` — sign in once at app start in
+  firebase mode (no sign-in screen); `useSession()` everywhere. Mock mode: `disabled`,
+  Firebase never loaded. `App.tsx` wraps navigation in `SessionProvider`.
+- Emulator test harness: `vitest.emulator.config.mjs`, `tests/emulator/emulator-env.ts`,
+  `npm run test:rules` (= `firebase emulators:exec --only auth,firestore --project
+  demo-vku-study-room-booking …`). Needs Java 21 on PATH.
+- Project check: Anonymous sign-in was already enabled on `vku-study-room-booking`
+  (a probe sign-up returned HTTP 200), so no console change was needed.
+Verification:
+  typecheck / lint / format → PASS; npm test → 21/21
+  npm run test:rules (Auth emulator, JDK 21) → 6/6: anonymous uid; same user reused;
+    concurrent first calls → one user; two devices → two uids; subscriber notified;
+    typed error mapping
+  Real browser, real project (firebase-mode web export): exactly one anonymous sign-up at
+    start (one POST; the second entry was the CORS preflight); the user is stored in
+    localStorage; after a reload the same uid is restored with no new sign-up
+  Mock-mode web export: renders, no Firebase/Google hosts contacted
+Commit: `feat(auth): add firebase anonymous session`
+Known issues: native persistence (AsyncStorage) is not exercised on a device here; the
+web path is. Clearing app data or reinstalling creates a new anonymous identity (AD-36).
+Next task: 07R
+
 ---
 
 ## Task log template

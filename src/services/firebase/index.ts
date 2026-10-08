@@ -4,6 +4,28 @@
  * Loaded only through `loadFirebaseBackend()` (dynamic import), never imported
  * statically from outside `src/services/firebase/`, so mock mode never evaluates
  * the Firebase SDK and the web build downloads it only in firebase mode.
+ *
+ * The modules it composes take their `Auth` / `Firestore` instance as a
+ * parameter (so they run against the emulator in tests); this file binds them to
+ * the app's lazily created instances.
  */
 
-export { getFirebaseServices } from '@/services/firebase/app';
+import { getFirebaseServices } from '@/services/firebase/app';
+import {
+  ensureAnonymousSession as ensureSessionFor,
+  sessionErrorCodeOf,
+  subscribeToSession as subscribeFor,
+} from '@/services/firebase/auth';
+
+import type { UserSession } from '@/types/session';
+
+export { getFirebaseServices, sessionErrorCodeOf };
+
+/** Signs in anonymously if needed and resolves with the session. */
+export function ensureAnonymousSession(): Promise<UserSession> {
+  return ensureSessionFor(getFirebaseServices().auth);
+}
+
+export function subscribeToSession(listener: (session: UserSession | null) => void): () => void {
+  return subscribeFor(getFirebaseServices().auth, listener);
+}

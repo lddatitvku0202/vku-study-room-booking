@@ -44,7 +44,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:rules": "firebase emulators:exec --only auth,firestore --project demo-vku-study-room-booking \"vitest run --config vitest.emulator.config.mjs\""
   },
   "private": true
 }
