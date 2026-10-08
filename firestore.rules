@@ -1,11 +1,188 @@
 rules_version = '2';
 
-// Placeholder until the security rules task (09R): deny everything.
-// Default deny is the required starting point (CLAUDE.md §8). Not deployed yet.
+// VKU Study Room Booking — Firestore Security Rules (CLAUDE.md §8).
+//
+// With no Cloud Functions, these rules are the only server-side enforcement.
+//   - Default deny: anything not matched below is refused.
+//   - Every write carries request.auth.uid (anonymous auth, AD-36) and may only
+//     act for that uid.
+//   - A booking and its slot lock can only be created together, and a lock can
+//     only be released together with its booking's cancellation: getAfter()
+//     checks the other document of the same commit.
+//   - An existing lock can never be updated, so it can never be stolen.
+// Honest limit (AD-30): rules cannot tell runTransaction() from a batch. They
+// enforce the coupling; uniqueness comes from create semantics (a create fails
+// if the lock exists) plus the denied update; lost updates are prevented by the
+// transaction's read-set validation.
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function bookingPath(bookingId) {
+      return /databases/$(database)/documents/bookings/$(bookingId);
+    }
+
+    function lockPath(slotKey) {
+      return /databases/$(database)/documents/slotLocks/$(slotKey);
+    }
+
+    function roomPath(roomId) {
+      return /databases/$(database)/documents/rooms/$(roomId);
+    }
+
+    // The four fixed slots (src/data/time-slots.ts). Times must match exactly.
+    function isFixedSlot(d) {
+      return (d.slotId == '07:30-09:30' && d.slotLabel == '07:30 - 09:30'
+                && d.startTime == '07:30' && d.endTime == '09:30')
+          || (d.slotId == '09:30-11:30' && d.slotLabel == '09:30 - 11:30'
+                && d.startTime == '09:30' && d.endTime == '11:30')
+          || (d.slotId == '13:00-15:00' && d.slotLabel == '13:00 - 15:00'
+                && d.startTime == '13:00' && d.endTime == '15:00')
+          || (d.slotId == '15:00-17:00' && d.slotLabel == '15:00 - 17:00'
+                && d.startTime == '15:00' && d.endTime == '17:00');
+    }
+
+    function isDateKey(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    // The instant a slot starts. Campus time is UTC+07 with no DST (AD-43):
+    // local HH:mm on `date` = UTC midnight of `date` + HH*60+mm - 420 minutes.
+    function slotStart(date, startTime) {
+      let d = date.split('-');
+      let t = startTime.split(':');
+      return timestamp.date(int(d[0]), int(d[1]), int(d[2]))
+        + duration.value(int(t[0]) * 60 + int(t[1]) - 420, 'm');
+    }
+
+    // Bookable: not started yet, and inside the 7-day booking window (8 days of
+    // margin absorbs the time of day and small client clock differences).
+    function isBookableTime(date, startTime) {
+      let start = slotStart(date, startTime);
+      return start > request.time && start < request.time + duration.value(8, 'd');
+    }
+
+    // ------------------------------------------------------------------ rooms
+    // Static catalogue: written only by the seed script (Admin SDK bypasses rules).
+    match /rooms/{roomId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // --------------------------------------------------------------- bookings
+    match /bookings/{bookingId} {
+      // Owner only. A get of a not-yet-existing id is allowed (it reveals only that
+      // the id is free), because the booking transaction reads it first.
+      allow get: if signedIn()
+        && (resource == null || resource.data.userId == request.auth.uid);
+      // Queries must be scoped to the caller's own bookings (where userId == uid).
+      allow list: if signedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isValidNewBooking(bookingId);
+      allow update: if isValidCancellation();
+      allow delete: if false; // history is kept; a booking is cancelled, never deleted
+
+      function isValidNewBooking(bookingId) {
+        let d = request.resource.data;
+        let fields = ['bookingId', 'userId', 'roomId', 'roomName', 'building', 'date',
+                      'slotId', 'slotLabel', 'startTime', 'endTime', 'slotKey', 'status',
+                      'createdAt', 'updatedAt', 'cancelledAt'];
+        return signedIn()
+          && d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+          && d.bookingId == bookingId
+          && d.userId == request.auth.uid
+          && d.status == 'confirmed'
+          && d.roomId is string
+          && isDateKey(d.date)
+          && isFixedSlot(d)
+          && d.slotKey == d.roomId + '_' + d.date + '_' + d.slotId
+          && d.createdAt == request.time
+          && d.updatedAt == request.time
+          && d.cancelledAt == null
+          && isMatchingRoom(d)
+          && isBookableTime(d.date, d.startTime)
+          && isLockedForThisBooking(d.slotKey, bookingId);
+      }
+
+      // The room exists and the denormalized name/building are its real ones.
+      function isMatchingRoom(d) {
+        let room = get(roomPath(d.roomId)).data;
+        return room.name == d.roomName && room.building == d.building;
+      }
+
+      // Coupling: the same commit creates the slot lock pointing back at this booking.
+      function isLockedForThisBooking(slotKey, bookingId) {
+        let lock = getAfter(lockPath(slotKey)).data;
+        return lock.bookingId == bookingId && lock.userId == request.auth.uid;
+      }
+
+      // Cancellation: only the owner, only a confirmed booking whose slot has not
+      // started, only these three fields, and the lock is released in the same commit.
+      function isValidCancellation() {
+        let before = resource.data;
+        let after = request.resource.data;
+        return signedIn()
+          && before.userId == request.auth.uid
+          && before.status == 'confirmed'
+          && after.diff(before).affectedKeys().hasOnly(['status', 'updatedAt', 'cancelledAt'])
+          && after.status == 'cancelled'
+          && after.updatedAt == request.time
+          && after.cancelledAt == request.time
+          && slotStart(before.date, before.startTime) > request.time
+          && !existsAfter(lockPath(before.slotKey));
+      }
+    }
+
+    // -------------------------------------------------------------- slotLocks
+    match /slotLocks/{slotKey} {
+      // Any signed-in user may see which slots are taken (realtime availability).
+      allow read: if signedIn();
+
+      // Created only together with its booking, for the caller's own uid.
+      // A create fails if the lock already exists, so a taken slot cannot be re-taken.
+      allow create: if isValidNewLock(slotKey);
+
+      // An existing lock is never modified — it cannot be stolen or repointed.
+      allow update: if false;
+
+      // Released only by its owner, in the same commit that cancels its booking.
+      allow delete: if isValidLockRelease(slotKey);
+
+      function isValidNewLock(slotKey) {
+        let d = request.resource.data;
+        let fields = ['slotKey', 'roomId', 'date', 'slotId', 'bookingId', 'userId', 'createdAt'];
+        let booking = getAfter(bookingPath(d.bookingId)).data;
+        return signedIn()
+          && d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+          && d.slotKey == slotKey
+          && d.userId == request.auth.uid
+          && d.bookingId is string
+          && d.roomId is string
+          && d.slotId is string
+          && isDateKey(d.date)
+          && slotKey == d.roomId + '_' + d.date + '_' + d.slotId
+          && d.createdAt == request.time
+          && booking.bookingId == d.bookingId
+          && booking.userId == request.auth.uid
+          && booking.status == 'confirmed'
+          && booking.slotKey == slotKey;
+      }
+
+      function isValidLockRelease(slotKey) {
+        let lock = resource.data;
+        let before = get(bookingPath(lock.bookingId)).data;
+        let after = getAfter(bookingPath(lock.bookingId)).data;
+        return signedIn()
+          && lock.userId == request.auth.uid
+          && before.userId == request.auth.uid
+          && before.slotKey == slotKey
+          && before.status == 'confirmed'
+          && after.status == 'cancelled';
+      }
     }
   }
 }

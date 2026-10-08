@@ -804,6 +804,52 @@ Commit: `feat(firestore): define typed persistence model and converters`
 Known issues: none.
 Next task: 09R
 
+## 09R — Firestore Security Rules and emulator tests
+
+Status: DONE
+Implemented:
+- `firestore.rules` (replaces the deny-all placeholder):
+  - default deny; `if true` appears nowhere; every rule requires `request.auth`;
+  - `rooms`: signed-in read, client write denied (seed script only);
+  - `bookings`: owner-only `get` (a get of a not-yet-existing id is allowed so the
+    transaction can read it), `list` only when scoped to the caller's uid; `create` only
+    with exactly the 15 model fields, `bookingId` = doc id, `userId == auth.uid`,
+    `status == 'confirmed'`, one of the four fixed slots with matching label/times,
+    `slotKey == roomId_date_slotId`, server timestamps (`createdAt == updatedAt ==
+    request.time`, `cancelledAt == null`), the room exists with that name and building,
+    the slot has not started and is inside the booking window (campus UTC+07, AD-43), and
+    — via `getAfter()` — the same commit creates the lock pointing back at this booking
+    for the same uid; `update` only as a cancellation by the owner of a confirmed,
+    not-yet-started booking, touching only `status`/`updatedAt`/`cancelledAt`, with the
+    lock gone after the commit (`!existsAfter`); `delete` never;
+  - `slotLocks`: signed-in read; `create` only with exactly its 7 fields, for the caller's
+    uid, key consistent with its fields, and — via `getAfter()` — a confirmed booking of the
+    same uid owning this key in the same commit; `update` never (no theft, no repointing);
+    `delete` only by its owner in the same commit that changes its booking from confirmed
+    (`get`) to cancelled (`getAfter`).
+- Tests: `tests/emulator/rules.test.ts` with real modular SDK clients signed in on the Auth
+  emulator (`rules-env.ts`: actors, seeding with rules disabled, campus-time dates);
+  `@firebase/rules-unit-testing@^6` (dev) loads the rules into the emulator.
+- **Deployed** to `vku-study-room-booking`: `firebase deploy --only
+  firestore:rules,firestore:indexes` (rules compiled server-side; indexes: none).
+Verification:
+  typecheck / lint / format → PASS; npm test → 57/57
+  npm run test:rules (JDK 21) → 46/46 (6 auth + 40 rules): unauthenticated denied; rooms
+    read-only; coupled create succeeds; booking without lock, lock without booking, lock
+    pointing elsewhere, lock for another slot → denied; forged userId (both docs / lock only
+    / booking only) → denied; taken slot, lock overwrite, owner lock update, foreign lock
+    delete → denied; 10 malformed fields, unknown room, past slot, beyond window, delete →
+    denied; owner reads, others denied, unscoped and foreign queries denied; owner cancel +
+    release succeeds; foreign cancel, cancel without release, release without cancel, extra
+    field change, double cancel, revival → denied; released slot re-bookable by another user
+  Mutation check: with the coupling check and the lock-update ban removed in a temporary
+    copy, exactly the 4 related tests failed; the file was restored byte-for-byte
+  Production (REST, after deploy): unauthenticated read → 403; anonymous read rooms → 200;
+    anonymous room write → 403; listing all bookings → 403
+Commit: `feat(security): add firestore rules and emulator tests`
+Known issues: two throwaway anonymous users exist in production from the auth probes.
+Next task: 10R
+
 ---
 
 ## Task log template

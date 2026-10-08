@@ -1,6 +1,7 @@
 // Emulator-backed tests (Auth + Firestore emulators, Security Rules, concurrency).
 // Run through `npm run test:rules`, which starts the emulators with a `demo-` project id
 // (AD-42) so these tests can never reach the real Firebase project.
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { defineConfig } from 'vitest/config';
@@ -9,7 +10,11 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
-  define: { __DEV__: 'false' },
+  define: {
+    __DEV__: 'false',
+    // The rules under test, read once here so test files need no Node APIs.
+    __FIRESTORE_RULES__: JSON.stringify(readFileSync('firestore.rules', 'utf8')),
+  },
   test: {
     include: ['tests/emulator/**/*.test.ts'],
     environment: 'node',
