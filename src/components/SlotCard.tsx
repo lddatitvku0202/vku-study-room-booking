@@ -11,16 +11,18 @@ import type { SlotId } from '@/data/time-slots';
  * - `available`  — can be picked
  * - `selected`   — the user's current pick
  * - `past`       — the slot has already started today
- * - `booked`     — a confirmed booking on this device already holds it
+ * - `booked`     — this user's own booking holds it ("Your booking")
+ * - `taken`      — another user's booking holds it (firebase mode, realtime)
  * - `conflicted` — the demo simulator reported a conflict for it this session
  */
-export type SlotCardState = 'available' | 'selected' | 'past' | 'booked' | 'conflicted';
+export type SlotCardState = 'available' | 'selected' | 'past' | 'booked' | 'taken' | 'conflicted';
 
 const STATE_CAPTION: Readonly<Record<SlotCardState, string>> = {
   available: 'Available',
   selected: 'Selected',
   past: 'Past',
   booked: 'Your booking',
+  taken: 'Booked',
   conflicted: 'Unavailable',
 };
 
@@ -29,6 +31,7 @@ const CAPTION_COLOR: Readonly<Record<SlotCardState, ColorToken>> = {
   selected: 'surface',
   past: 'disabled',
   booked: 'primary',
+  taken: 'textSecondary',
   conflicted: 'error',
 };
 
@@ -37,10 +40,16 @@ const LABEL_COLOR: Readonly<Record<SlotCardState, ColorToken>> = {
   selected: 'surface',
   past: 'disabled',
   booked: 'primary',
+  taken: 'disabled',
   conflicted: 'textSecondary',
 };
 
-const DISABLED_STATES: ReadonlySet<SlotCardState> = new Set(['past', 'booked', 'conflicted']);
+const DISABLED_STATES: ReadonlySet<SlotCardState> = new Set([
+  'past',
+  'booked',
+  'taken',
+  'conflicted',
+]);
 
 export interface SlotCardProps {
   readonly slotId: SlotId;
@@ -69,6 +78,7 @@ export const SlotCard = memo(function SlotCard({ slotId, label, state, onSelect 
         isSelected && styles.selected,
         state === 'past' && styles.past,
         state === 'booked' && styles.booked,
+        state === 'taken' && styles.taken,
         state === 'conflicted' && styles.conflicted,
         pressed && !isSelected && styles.pressed,
       ]}
@@ -108,6 +118,9 @@ const styles = StyleSheet.create({
   booked: {
     borderColor: colors.primary,
     borderWidth: 2,
+  },
+  taken: {
+    backgroundColor: colors.background,
   },
   conflicted: {
     backgroundColor: colors.background,

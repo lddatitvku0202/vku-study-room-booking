@@ -65,3 +65,10 @@ export interface SlotLock {
   readonly userId: string;
   readonly createdAt: string;
 }
+
+/** A realtime view of slot locks, as delivered by a listener (26R). */
+export interface SlotLockSnapshot {
+  readonly locks: readonly SlotLock[];
+  /** False while the data comes from the local cache only (e.g. offline) — AD-44. */
+  readonly fromServer: boolean;
+}

@@ -17,6 +17,12 @@ import {
   subscribeToSession as subscribeFor,
 } from '@/services/firebase/auth';
 import { fetchRoomCatalogue } from '@/services/firebase/rooms';
+import {
+  listenToDateLocks,
+  listenToRoomLocks,
+  type ErrorListener,
+  type LockListener,
+} from '@/services/firebase/slot-locks';
 
 import type { Room } from '@/types/room';
 import type { UserSession } from '@/types/session';
@@ -40,4 +46,56 @@ export async function fetchRooms(): Promise<readonly Room[]> {
     console.warn(`[rooms] skipped ${skipped.length} malformed room document(s):`, skipped);
   }
   return rooms;
+}
+
+/**
+ * Starts a listener once the anonymous session exists (the rules require a
+ * signed-in user to read locks). Returns a stop function that also works while
+ * the session is still being established.
+ */
+function afterSession(start: () => () => void, onError: ErrorListener): () => void {
+  let stop: (() => void) | undefined;
+  let stopped = false;
+  ensureAnonymousSession().then(
+    () => {
+      if (!stopped) stop = start();
+    },
+    (error: unknown) => {
+      if (!stopped) onError(error);
+    },
+  );
+  return () => {
+    stopped = true;
+    stop?.();
+  };
+}
+
+/** Realtime locks of one room on one date. */
+export function subscribeToRoomLocks(
+  roomId: string,
+  date: string,
+  onNext: LockListener,
+  onError: ErrorListener,
+): () => void {
+  return afterSession(
+    () => listenToRoomLocks(getFirebaseServices().db, roomId, date, onNext, onError),
+    onError,
+  );
+}
+
+/** Realtime locks of all rooms on one date. */
+export function subscribeToDateLocks(
+  date: string,
+  onNext: LockListener,
+  onError: ErrorListener,
+): () => void {
+  return afterSession(
+    () => listenToDateLocks(getFirebaseServices().db, date, onNext, onError),
+    onError,
+  );
+}
+
+/** The signed-in uid, if any (never signs in). */
+export function currentUserId(): string | undefined {
+  return getFirebaseServices().auth.currentUser?.uid;
 }

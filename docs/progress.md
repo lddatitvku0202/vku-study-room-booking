@@ -906,6 +906,49 @@ Commit: `feat(rooms): read rooms from firestore behind data-source flag`
 Known issues: none.
 Next task: 26R
 
+## 26R — Realtime slot availability bridged into the query cache
+
+Status: DONE
+Implemented:
+- `services/firebase/slot-locks.ts` — bounded `onSnapshot` listeners: `listenToRoomLocks`
+  (`slotLocks where roomId == r and date == d`, the slot grid) and `listenToDateLocks`
+  (`where date == today`, room-list status). Documents validated by `slotLockFromDocument`;
+  `includeMetadataChanges` so every snapshot reports `fromServer` (cache vs server).
+  `services/firebase/index.ts` starts them only after the anonymous session exists.
+- `hooks/realtime-registry.ts` — reference-counted listeners: one underlying listener per
+  key however many components mount it; stopped when the last one unmounts.
+- `hooks/useRealtimeQuery.ts` — `onSnapshot` → `setQueryData` → `useQuery(skipToken)`: the
+  listener is the only writer, so a refetch can never overwrite fresher realtime data; the
+  last known value survives a remount for the query's gc time.
+- `hooks/useRoomAvailability.ts` — mock: this device's demo bookings (unchanged MVP
+  behaviour); firebase: realtime locks split into "mine" and "taken by others"
+  (`utils/availability.ts`, pure) plus `isLive` (server-confirmed).
+- `hooks/useRoomStatus.ts` — mock: the MVP's demo label; firebase: derived from today's
+  locks (occupied = a booked slot covers now; re-evaluated every minute; one listener for
+  the whole list, never per row; AD-31/AD-32).
+- UI: `SlotCard` gains `taken` ("Booked", someone else's booking); Room Details shows taken
+  slots and excludes them from alternatives; captions say "live booking status, not sensor
+  occupancy" in firebase mode. Booking in firebase mode is refused with a notice until 31R —
+  firebase mode never falls back to the local simulator (AD-38).
+- Query keys: `availabilityKeys.room(roomId, date)`, `availabilityKeys.date(date)`.
+Verification:
+  typecheck / lint → PASS
+  npm test → 72/72 (+15): lock partition, slot-boundary activity (start inclusive, end
+    exclusive), derived status, registry (sharing, release, double release, errors, restart)
+  npm run test:rules → 51/51 (+3): client B's booking and its cancellation reach client A's
+    grid listener; another room's booking does not; the date listener sees every room
+    booked that day; a signed-out listener gets permission-denied
+  Production, real UI (headless Edge = client A, a separate anonymous SDK client = B):
+    slot Available → B books → A shows "Booked" with no interaction (7.6 s measured from
+    before B's first write, including B's connection setup) → B cancels → A shows
+    Available again (1.3 s); live-status caption shown; firebase-mode booking refused, no
+    simulator fallback; no page errors. One cancelled test booking remains in production.
+  Mock-mode browser regression → PASS
+Commit: `feat(realtime): bridge slot lock listeners into query cache`
+Known issues: listeners are not yet detached while the app is backgrounded (PLAN TASK 27);
+similar-room suggestions only know the current room's live locks.
+Next task: 28R
+
 ---
 
 ## Task log template

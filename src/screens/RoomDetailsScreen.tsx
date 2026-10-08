@@ -16,12 +16,14 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { colors, radius, spacing } from '@/data/theme';
 import { TIME_SLOTS, type SlotId } from '@/data/time-slots';
 import { useRoom, useRooms } from '@/hooks/use-rooms';
+import { useDataSource } from '@/hooks/useDataSource';
 import { useNow } from '@/hooks/useNow';
+import { useRoomAvailability } from '@/hooks/useRoomAvailability';
+import { useRoomStatus } from '@/hooks/useRoomStatus';
 import { createDemoBookingId, reserveRoomDemo } from '@/services/bookingSimulator';
 import { useBookingStore, useBookingStoreHydrated } from '@/store/useBookingStore';
 import { getBookableDates, isSlotPast, toDateKey, type BookableDate } from '@/utils/booking-dates';
-import { findConfirmedBooking, getConfirmedSlotKeys } from '@/utils/booking-rules';
-import { getMockRoomStatus } from '@/utils/mock-room-status';
+import { findConfirmedBooking } from '@/utils/booking-rules';
 import { findSimilarRooms } from '@/utils/similar-rooms';
 import { buildSlotKey } from '@/utils/slot-key';
 
@@ -77,7 +79,7 @@ export function RoomDetailsScreen({
   const { data: allRoomsData } = useRooms();
   const allRooms = allRoomsData ?? NO_ROOMS;
 
-  const bookings = useBookingStore((state) => state.bookings);
+  const isFirebase = useDataSource() === 'firebase';
   const conflictedSlotKeys = useBookingStore((state) => state.conflictedSlotKeys);
   const addBooking = useBookingStore((state) => state.addBooking);
   const markSlotConflict = useBookingStore((state) => state.markSlotConflict);
@@ -95,7 +97,11 @@ export function RoomDetailsScreen({
   const inFlightRef = useRef(false);
   const slotListRef = useRef<FlatList<SlotItem>>(null);
 
-  const bookedKeys = useMemo(() => getConfirmedSlotKeys(bookings), [bookings]);
+  // Mock: this device's demo bookings. Firebase: realtime slot locks (26R).
+  const availability = useRoomAvailability(roomId, selectedDate);
+  const bookedKeys = availability.mine;
+  const takenKeys = availability.takenByOthers;
+  const { statusOf } = useRoomStatus();
   const conflictedKeys = useMemo(() => new Set(conflictedSlotKeys), [conflictedSlotKeys]);
 
   // A date is valid only while it is inside the 7-day window (it can fall out if
@@ -111,6 +117,8 @@ export function RoomDetailsScreen({
           state = 'past';
         } else if (bookedKeys.has(key)) {
           state = 'booked';
+        } else if (takenKeys.has(key)) {
+          state = 'taken';
         } else if (conflictedKeys.has(key)) {
           state = 'conflicted';
         } else if (slot.id === selectedSlotId) {
@@ -118,7 +126,7 @@ export function RoomDetailsScreen({
         }
         return { slot, state };
       }),
-    [roomId, selectedDate, selectedSlotId, now, bookedKeys, conflictedKeys],
+    [roomId, selectedDate, selectedSlotId, now, bookedKeys, takenKeys, conflictedKeys],
   );
 
   const selectedItem = slotItems.find((item) => item.slot.id === selectedSlotId);
@@ -142,7 +150,7 @@ export function RoomDetailsScreen({
     }
     return findSimilarRooms(room, allRooms, (candidate) => {
       const key = buildSlotKey(candidate.id, conflict.date, conflict.slotId);
-      return bookedKeys.has(key) || conflictedKeys.has(key);
+      return bookedKeys.has(key) || takenKeys.has(key) || conflictedKeys.has(key);
     });
   }, [
     showAlternatives,
@@ -151,6 +159,7 @@ export function RoomDetailsScreen({
     allRooms,
     conflict,
     bookedKeys,
+    takenKeys,
     conflictedKeys,
   ]);
   const conflictSlotLabel = TIME_SLOTS.find((slot) => slot.id === conflict?.slotId)?.label;
@@ -166,6 +175,15 @@ export function RoomDetailsScreen({
 
   const submitBooking = useCallback(async () => {
     if (inFlightRef.current || !canBook || room === undefined || selectedItem === undefined) {
+      return;
+    }
+    if (isFirebase) {
+      // Temporary until the Firestore booking transaction is wired (31R): firebase mode
+      // must never fall back to the local simulator (AD-38).
+      showDialog(
+        'Booking unavailable',
+        'Booking through Firebase is not enabled in this build yet.',
+      );
       return;
     }
     const { slot } = selectedItem;
@@ -217,7 +235,16 @@ export function RoomDetailsScreen({
       inFlightRef.current = false;
       setIsSubmitting(false);
     }
-  }, [canBook, room, selectedItem, selectedDate, addBooking, markSlotConflict, navigation]);
+  }, [
+    isFirebase,
+    canBook,
+    room,
+    selectedItem,
+    selectedDate,
+    addBooking,
+    markSlotConflict,
+    navigation,
+  ]);
 
   const handleBook = useCallback(() => {
     void submitBooking();
@@ -291,7 +318,7 @@ export function RoomDetailsScreen({
     );
   }
 
-  const status = getMockRoomStatus(room.id);
+  const status = statusOf(room.id);
 
   const header = (
     <View>
@@ -312,7 +339,9 @@ export function RoomDetailsScreen({
             tone={status === 'available' ? 'success' : 'error'}
           />
           <AppText variant="caption" color="textSecondary">
-            Demo status, not live occupancy
+            {isFirebase
+              ? 'Live booking status, not sensor occupancy'
+              : 'Demo status, not live occupancy'}
           </AppText>
         </View>
       </View>

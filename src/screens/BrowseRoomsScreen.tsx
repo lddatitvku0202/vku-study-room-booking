@@ -12,8 +12,8 @@ import { spacing } from '@/data/theme';
 import { useRooms } from '@/hooks/use-rooms';
 import { useDataSource } from '@/hooks/useDataSource';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useRoomStatus } from '@/hooks/useRoomStatus';
 import { useBookingStore } from '@/store/useBookingStore';
-import { getMockRoomStatus } from '@/utils/mock-room-status';
 import { filterRooms, hasActiveFilters } from '@/utils/room-filters';
 
 import type { MainTabScreenProps } from '@/navigation/types';
@@ -66,6 +66,7 @@ function equipmentLabel(item: Equipment): string {
 export function BrowseRoomsScreen({ navigation }: MainTabScreenProps<'BrowseRooms'>): JSX.Element {
   const { data: rooms, isPending, isError, refetch } = useRooms();
   const dataSource = useDataSource();
+  const { statusOf } = useRoomStatus();
 
   // One selector per field: each returns a primitive or a stable array reference,
   // so the screen re-renders only when a criterion it uses actually changes.
@@ -104,14 +105,15 @@ export function BrowseRoomsScreen({ navigation }: MainTabScreenProps<'BrowseRoom
     equipment,
   });
 
-  // Demo status, computed once per dataset rather than per row render.
+  // Status per room, computed once per dataset / status change rather than per row
+  // render (mock: demo label; firebase: derived from today's bookings).
   const statusById = useMemo(() => {
     const map = new Map<string, RoomStatus>();
     for (const room of allRooms) {
-      map.set(room.id, getMockRoomStatus(room.id));
+      map.set(room.id, statusOf(room.id));
     }
     return map;
-  }, [allRooms]);
+  }, [allRooms, statusOf]);
 
   // Stable across renders (navigation is stable), so memoized cards stay memoized.
   const openRoom = useCallback(
@@ -154,7 +156,7 @@ export function BrowseRoomsScreen({ navigation }: MainTabScreenProps<'BrowseRoom
         <AppText variant="title">Study Rooms</AppText>
         <AppText variant="caption" color="textSecondary">
           {dataSource === 'firebase'
-            ? 'Rooms from Firestore · status is a preview, not live occupancy'
+            ? 'Rooms from Firestore · live booking status, not sensor occupancy'
             : 'Demo data · status is a preview, not live occupancy'}
         </AppText>
 
