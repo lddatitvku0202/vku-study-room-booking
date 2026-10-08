@@ -822,6 +822,11 @@ and adds or verifies one Firebase path behind `DATA_SOURCE=firebase`. The origin
 whose intent a bridge task carries is shown in brackets; its acceptance criteria still apply
 unless a decision (AD-36 … AD-44) changed them.
 
+**Status (2026-10-08):** R0 → 36R and RD are DONE and verified (see `docs/progress.md`,
+Post-MVP bridge log). Remaining from the original plan: TASK 17 (deep links), 20/45
+(profiling), 27 (pausing listeners in the background), 40–42 (Reanimated, gestures,
+accessibility pass), 46 (CI), the `production` store build and iOS.
+
 | Task | Goal | Commit |
 |---|---|---|
 | R0 | Reconcile documentation with the post-MVP repository; record AD-36 … AD-44 | `docs(progress): record post-MVP baseline and Firebase resume decisions` |

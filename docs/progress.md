@@ -619,31 +619,33 @@ notification delivery on a device.
 
 ## Current state
 
-**Status:** Post-MVP bridge in progress — Firebase realtime work resumed from the MVP baseline.
-**Baseline:** HEAD `9f74c86` ("docs: add pictures demo"), clean, typecheck + lint PASS,
-identical to `origin/main` at the time of R0.
-**Completed:** TASK 00 – TASK 05 (foundation) and the Emergency Submission MVP (MVP-01 –
-MVP-07, `b989d6f` … `c5bfb93`), plus web dependencies (`1565b1b`) and README demo assets
-(`7c6eb50`, `9f74c86`). The MVP is deployed as a local-data web demo at
-https://vku-study-room-booking-7i4.pages.dev/.
-**Current Task:** Post-MVP bridge — see PLAN.md "Phase B". R0 (this documentation
-reconciliation) → W1 → 06R → …
-**Firebase status at R0:** **not live.** No Firebase SDK installed, no Firebase import in
-`src/`, no `firebase.json`, no rules, no indexes in the repository. The Firebase project
-`vku-study-room-booking` exists (Spark, Firestore `(default)` Native in
-`asia-southeast1`, no web app registered yet, no indexes).
-**Superseded:** TASK 05B (base UI primitives) — delivered by the MVP in
-`src/components/ui/`. Original TASK 06 – TASK 48 are re-sequenced as bridge tasks (PLAN.md
-Phase B) that build on the MVP instead of replacing it.
+**Status:** Post-MVP Firebase bridge complete (R0 → 36R + RD). Firebase realtime production
+architecture implemented behind `DATA_SOURCE=firebase`; the submitted MVP survives unchanged
+as `DATA_SOURCE=mock` (default, used by the Cloudflare web demo).
+**Firebase project:** `vku-study-room-booking` (Spark, Firestore `(default)` Native,
+`asia-southeast1`). Anonymous Auth enabled; one Web app registered; Security Rules deployed
+(`firestore.rules`); indexes: none needed (deployed empty); 120 rooms seeded.
+**Verification baseline:** typecheck (app + scripts), lint, format → PASS; `npm test` 129/129;
+`npm run test:rules` 84/84 (Java 21); production checks through the real UI in a browser
+(two-user race, realtime, cancellation release, My Bookings isolation, QR withdrawal, offline
+lockout); 30-user contention demo on production (one hot-slot winner).
+**Mobile:** EAS project `@lddatitvku0202/vku-study-room-booking` linked; `preview` (APK) and
+`production` profiles; Firebase web config in EAS environment variables. Android `preview` APK built on EAS (build `64ba3da7…`, from `e4673ca`) and verified 21/21 on an Android 13
+emulator against the real project (fresh install). The `production` store build and iOS were not run.
+**Not verified:** firebase mode on a physical phone (an emulator was used); notification
+delivery (registration/removal verified); the `production` EAS build; iOS (needs an Apple
+Developer account).
+**Known limitations:** see README "Limitations".
+**Next:** owner review and push (nothing is pushed automatically).
 
 **Prerequisites / environment:**
-- Firebase emulators need **Java 21+** (firebase-tools 15.x). The default `java` on PATH is
-  1.8.0_202; a JDK 21 is installed at `C:\Program Files\Eclipse Adoptium\jdk-21.0.6.7-hotspot`
-  and is put first on PATH only for emulator commands (the system Java is left untouched).
-- The Firebase CLI is authenticated by the project owner; the project is selected per
-  command or via `.firebaserc`.
+- Firebase emulators and `npm run test:rules` need **Java 21+** on PATH (a JDK 21 is installed
+  at `C:\Program Files\Eclipse Adoptium\jdk-21.0.6.7-hotspot`; the system default is 1.8).
+- The Firebase CLI (global `firebase-tools`, logged in) is needed for deploys, the seed script's
+  production path and the emulator scripts.
+- After changing `.env` or `DATA_SOURCE`, start/export with `--clear`.
 
-**Blocked on:** nothing at R0.
+**Blocked on:** nothing.
 
 ---
 
@@ -1249,6 +1251,57 @@ Commit: `feat(booking): enforce offline booking lockout`
 Known issues: an `UNCONFIRMED` booking that later committed is visible in My Bookings (the
 realtime list) — the user is told to check there.
 Next task: RD (production configuration and documentation)
+
+## RD — Production configuration, Android build and documentation
+
+Status: DONE (Android); iOS and the `production` store build not run
+Implemented:
+- `eas.json` — `preview` (internal Android APK) and `production` profiles, both forcing
+  `DATA_SOURCE=firebase`, `APP_ENV=production`, `USE_FIREBASE_EMULATOR=false`. The Firebase web
+  config lives in the EAS `preview` / `production` environment variables (set with
+  `eas env:create`), not in git. `app.json`: app identifiers `vn.edu.vku.studyroombooking`
+  (owner may change them before any store submission) and the EAS project link
+  (`@lddatitvku0202/vku-study-room-booking`, created with `eas init`). Expo patch versions
+  aligned (`expo install --fix`).
+- The local simulator throws if called in firebase mode (hard guard for AD-38). It is still
+  present in the native bundle (statically imported by the mock path) but unreachable.
+- Docs: README (two data sources, architecture, booking concurrency, rules, how to run each
+  mode, Firebase setup, tests, demo, EAS build, verification, limitations); PLAN.md Phase B
+  status; CLAUDE.md §19 implementation map; this log.
+Verification:
+  EAS build `64ba3da7-ba6f-4b60-95a0-68b8c79e5f7d` (preview, Android) → FINISHED from commit
+    `e4673ca`; EAS generated and stores the Android keystore; the APK's embedded config:
+    `dataSource=firebase`, `appEnv=production`, emulator off, project `vku-study-room-booking`
+  **Production APK on an Android 13 emulator (Google APIs x86_64, local AVD), real project,
+  fresh install → 21/21 PASS** (`adb` + UI Automator driver, plus an independent SDK client):
+    installs; firebase mode with 120 rooms from Firestore; Building V filter → 30 / cleared →
+    120; search "V501" → 1; Room Details with the live-status caption; a second user's booking
+    of 13:00 appears as "Booked" on the device with no interaction and its cancellation
+    releases it; booking 07:30 through the real transaction → the slot lock exists in
+    production Firestore and belongs to the device's anonymous uid; QR pass with the right
+    payload; Android 13 notification permission prompt shown and allowed; "Reminder set for
+    07:15 on 2026-10-10" and the reminder alarm registered (`dumpsys alarm`); cancellation via
+    My Bookings (confirm dialog) → Cancelled 0 → 1, lock released in Firestore, alarm removed
+    (2 → 0); force-stop + relaunch → same anonymous user and history (AsyncStorage
+    persistence); app process alive after restart. (Earlier runs failed only on test-driver
+    issues — a "System UI isn't responding" dialog of the software-rendered emulator, the slot
+    grid and reminder notice below the fold on a 320×640 screen, and an absolute count that
+    ignored the persisted history — each fixed in the driver, not the app. Test bookings left
+    by an interrupted run were cancelled with an admin token from the developer's CLI login.)
+  Final suite: typecheck (app + scripts), lint, format → PASS; npm test 129/129;
+    npm run test:rules 84/84 (incl. N = 20 → 1 success / 19 SLOT_TAKEN and three 30-user
+    contention runs); web export mock + firebase → PASS; mock-mode browser regression 8/8;
+    mock build contacts no Firebase host; two-user race through the real UI on production
+    13/13 (the first attempt tapped before the screens had server-confirmed availability —
+    the 36R lockout correctly ignored it; the test now waits like a user would);
+    Cloudflare demo HTTP 200
+  Static: `Math.random` only in the mock simulator (guarded) and booking-id generation; no
+    Firebase import outside `src/services/firebase/`; only `.env.example` tracked; no API key
+    in tracked files
+Not verified: firebase mode on a physical phone; notification delivery (registration and
+removal verified); the `production` EAS build; iOS.
+Commit: `docs(release): document firebase realtime release and verification`
+Next task: none scheduled — owner review and push.
 
 ---
 

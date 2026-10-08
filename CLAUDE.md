@@ -381,3 +381,25 @@ client.** A rules change is a security change and must be called out in the task
 
 Development may use the **Firebase Emulator Suite** where appropriate. Production uses
 only the services listed in §2, within Spark plan quota limits.
+
+## 19. Implementation map (post-MVP bridge)
+
+Where each guarantee lives, so a change starts in the right file. Decisions: AD-36 … AD-44
+in `docs/progress.md`.
+
+| Concern | File |
+|---|---|
+| Data-source switch, config validation | `src/utils/parse-config.ts`, `src/services/config.ts` |
+| Lazy Firebase entry point (only `import()`ed in firebase mode) | `src/services/firebase-backend.ts` → `src/services/firebase/index.ts` |
+| Anonymous session | `src/services/firebase/auth.ts`, `src/hooks/useSession.ts` |
+| Firestore documents + converters | `src/services/firebase/model.ts` |
+| Booking contract (pure) | `src/utils/booking-contract.ts` |
+| Booking / cancellation transactions | `src/services/firebase/booking-transactions.ts` |
+| Realtime listeners → TanStack Query | `src/services/firebase/slot-locks.ts`, `src/hooks/useRealtimeQuery.ts`, `src/hooks/realtime-registry.ts` |
+| Security Rules | `firestore.rules` (deploy before the client) |
+| Emulator tests (rules, transactions, realtime, offline, demo) | `tests/emulator/`, `npm run test:rules` (Java 21+) |
+| Mock-mode MVP (simulator, device store) | `src/services/bookingSimulator.ts`, `src/store/useBookingStore.ts` |
+
+Any change to booking, cancellation or the rules must keep `npm run test:rules` green,
+including the N-parallel contention test.
+
