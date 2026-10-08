@@ -107,17 +107,17 @@ describe('two clients, one slot grid', () => {
     await grid.waitFor((s) => s.fromServer && s.locks.length === 0);
 
     const bookingB205: NewBookingInput = {
-      bookingId: 'rt-b205',
+      bookingId: 'rt-b205-booking',
       userId: booker.uid,
       room: ROOM_B205,
       date,
       slot: FIRST_SLOT,
     };
-    const bookingA101: NewBookingInput = { ...bookingB205, bookingId: 'rt-a101', room: ROOM_A101 };
+    const bookingA101: NewBookingInput = { ...bookingB205, bookingId: 'rt-a101-booking', room: ROOM_A101 };
     await book(booker.db, bookingA101); // another room: must not appear in this grid
     await book(booker.db, bookingB205);
 
-    await grid.waitFor((s) => s.locks.some((l) => l.bookingId === 'rt-b205'));
+    await grid.waitFor((s) => s.locks.some((l) => l.bookingId === 'rt-b205-booking'));
     const latest = grid.snapshots[grid.snapshots.length - 1];
     expect(latest?.locks.map((l) => l.roomId)).toEqual(['room-B205']);
     expect(latest?.locks[0]?.userId).toBe(booker.uid);
@@ -135,14 +135,14 @@ describe('two clients, one slot grid', () => {
     const stop = listenToDateLocks(watcher.db, date, day.onNext, () => undefined);
     await day.waitFor((s) => s.fromServer);
     const base: NewBookingInput = {
-      bookingId: 'day-1',
+      bookingId: 'day-booking-1',
       userId: booker.uid,
       room: ROOM_B205,
       date,
       slot: FIRST_SLOT,
     };
     await book(booker.db, base);
-    await book(booker.db, { ...base, bookingId: 'day-2', room: ROOM_A101, slot: LAST_SLOT });
+    await book(booker.db, { ...base, bookingId: 'day-booking-2', room: ROOM_A101, slot: LAST_SLOT });
     await day.waitFor((s) => s.locks.length === 2);
     stop();
   });

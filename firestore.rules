@@ -46,6 +46,11 @@ service cloud.firestore {
                 && d.startTime == '15:00' && d.endTime == '17:00');
     }
 
+    // Booking ids: the client-generated, retry-stable id (I6) — url-safe, bounded length.
+    function isBookingId(value) {
+      return value is string && value.matches('^[A-Za-z0-9_-]{8,64}$');
+    }
+
     function isDateKey(value) {
       return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
     }
@@ -93,6 +98,7 @@ service cloud.firestore {
                       'createdAt', 'updatedAt', 'cancelledAt'];
         return signedIn()
           && d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+          && isBookingId(bookingId)
           && d.bookingId == bookingId
           && d.userId == request.auth.uid
           && d.status == 'confirmed'
@@ -169,7 +175,11 @@ service cloud.firestore {
           && booking.bookingId == d.bookingId
           && booking.userId == request.auth.uid
           && booking.status == 'confirmed'
-          && booking.slotKey == slotKey;
+          && booking.slotKey == slotKey
+          // Defense in depth: the lock's own fields equal its booking's, not only the key.
+          && booking.roomId == d.roomId
+          && booking.date == d.date
+          && booking.slotId == d.slotId;
       }
 
       function isValidLockRelease(slotKey) {

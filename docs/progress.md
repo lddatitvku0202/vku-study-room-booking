@@ -1006,6 +1006,34 @@ Commit: `feat(booking): add atomic firestore booking transaction`
 Known issues: none. The UI still refuses firebase-mode booking until 31R wires this in.
 Next task: 30R
 
+## 30R — Rules enforce the booking-transaction invariants
+
+Status: DONE
+Implemented: reviewed `firestore.rules` against the real transaction; every required path
+was already enforced by 09R (coupling, ownership, no lock update, coupled cancellation).
+Strengthened as defense in depth: a booking document id must be url-safe and 8–64
+characters (`isBookingId`), and a new lock's `roomId`/`date`/`slotId` must equal its
+booking's fields, not only the combined key. New `tests/emulator/transaction-rules.test.ts`
+drives the real `createBookingTransaction` plus hostile commits. Redeployed to production.
+Found by the new rule: the realtime tests used 7-character ids; the tests were changed, not
+the rule.
+Verification:
+  typecheck / lint → PASS
+  npm run test:rules → 70/70 (+10): the legitimate transaction passes the rules; a too-short
+    id is refused; the owner cannot change a confirmed booking's room name, date, slot key
+    or owner; deleting another user's lock and taking the slot in one commit → denied;
+    cancelling your own booking while releasing someone else's lock → denied; after the
+    winner books, the loser's transaction is a typed conflict and a direct coupled write is
+    denied; the owner's coupled cancellation of a transaction-made booking → accepted.
+    (Together with 09R/29R: lone booking, lone lock, forged userId, booking for another
+    user, lock theft, unauthorized modification and cancellation bypass are all denied.)
+  Mutation check: removing `isBookingId` from a temporary copy made exactly the matching
+    test fail; the file was restored byte-for-byte
+  Deploy: rules compiled server-side and released to `vku-study-room-booking`
+Commit: `feat(security): enforce booking transaction invariants`
+Known issues: none.
+Next task: 31R
+
 ---
 
 ## Task log template
