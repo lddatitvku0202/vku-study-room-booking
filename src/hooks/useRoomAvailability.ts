@@ -11,6 +11,11 @@ import { getConfirmedSlotKeys } from '@/utils/booking-rules';
 
 import type { SlotLockSnapshot } from '@/types/booking';
 
+/** A lock snapshot plus whether this listener has ever been server-confirmed. */
+interface AvailabilitySnapshot extends SlotLockSnapshot {
+  readonly everConfirmed: boolean;
+}
+
 export interface RoomAvailability {
   /** Slot keys held by this user (shown as "Your booking"). */
   readonly mine: ReadonlySet<string>;
@@ -21,6 +26,12 @@ export interface RoomAvailability {
    * in firebase mode false until the first server snapshot and while offline.
    */
   readonly isLive: boolean;
+  /**
+   * True once this listener has had a server-confirmed snapshot. Lets the UI tell
+   * "still connecting" (never confirmed yet) from "went offline" (confirmed before,
+   * now only cached data).
+   */
+  readonly wasLive: boolean;
   readonly isLoading: boolean;
   readonly hasError: boolean;
 }
@@ -63,14 +74,25 @@ export function useRoomAvailability(roomId: string, date: string): RoomAvailabil
   const bookings = useBookingStore((state) => state.bookings);
   const isHydrated = useBookingStoreHydrated();
 
-  const realtime = useRealtimeQuery<SlotLockSnapshot>({
+  const realtime = useRealtimeQuery<AvailabilitySnapshot>({
     queryKey: availabilityKeys.room(roomId, date),
     enabled: isFirebase && roomId !== '' && date !== '',
-    subscribe: (onData, onError) =>
-      subscribeViaBackend(
-        (backend) => backend.subscribeToRoomLocks(roomId, date, onData, onError),
+    subscribe: (onData, onError) => {
+      let everConfirmed = false;
+      return subscribeViaBackend(
+        (backend) =>
+          backend.subscribeToRoomLocks(
+            roomId,
+            date,
+            (snapshot) => {
+              everConfirmed = everConfirmed || snapshot.fromServer;
+              onData({ ...snapshot, everConfirmed });
+            },
+            onError,
+          ),
         onError,
-      ),
+      );
+    },
   });
 
   const uid = session.status === 'signed-in' ? session.session.uid : undefined;
@@ -83,6 +105,7 @@ export function useRoomAvailability(roomId: string, date: string): RoomAvailabil
         mine: getConfirmedSlotKeys(bookings),
         takenByOthers: NONE,
         isLive: true,
+        wasLive: true,
         isLoading: !isHydrated,
         hasError: false,
       };
@@ -92,6 +115,7 @@ export function useRoomAvailability(roomId: string, date: string): RoomAvailabil
       mine,
       takenByOthers: others,
       isLive: snapshot?.fromServer ?? false,
+      wasLive: snapshot?.everConfirmed ?? false,
       isLoading: snapshot === undefined && !hasError,
       hasError,
     };

@@ -149,9 +149,13 @@ export function RoomDetailsScreen({
   );
 
   const selectedItem = slotItems.find((item) => item.slot.id === selectedSlotId);
+  // Firebase mode: booking only on server-confirmed availability — never on a
+  // cached (possibly stale) snapshot, never queued offline (AD-44).
+  const isServerConfirmed = !isFirebase || availability.isLive;
   const canBook =
     room !== undefined &&
     isHydrated &&
+    isServerConfirmed &&
     !isSubmitting &&
     isDateValid &&
     selectedItem?.state === 'selected';
@@ -447,9 +451,13 @@ export function RoomDetailsScreen({
     ? 'Processing your booking…'
     : !isHydrated
       ? 'Loading your saved bookings…'
-      : canBook && selectedItem !== undefined
-        ? `${selectedDate} · ${selectedItem.slot.label}`
-        : 'Choose a date and an available time slot';
+      : !isServerConfirmed
+        ? availability.wasLive
+          ? 'Offline — booking needs a connection to the server. Nothing is queued.'
+          : 'Checking availability with the server…'
+        : canBook && selectedItem !== undefined
+          ? `${selectedDate} · ${selectedItem.slot.label}`
+          : 'Choose a date and an available time slot';
 
   return (
     <Screen edges={SCREEN_EDGES}>

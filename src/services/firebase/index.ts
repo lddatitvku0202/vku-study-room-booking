@@ -28,6 +28,7 @@ import {
   type ErrorListener,
   type LockListener,
 } from '@/services/firebase/slot-locks';
+import { withTimeout } from '@/utils/with-timeout';
 
 import type { Booking } from '@/types/booking';
 import type { Room } from '@/types/room';
@@ -35,6 +36,9 @@ import type { UserSession } from '@/types/session';
 import type { BookingOutcome, BookingRequest, CancelOutcome } from '@/utils/booking-contract';
 
 export { getFirebaseServices, sessionErrorCodeOf };
+
+/** How long a booking or cancellation may wait for the server before it is reported unconfirmed. */
+const SERVER_TIMEOUT_MS = 15_000;
 
 /** Signs in anonymously if needed and resolves with the session. */
 export function ensureAnonymousSession(): Promise<UserSession> {
@@ -113,7 +117,13 @@ export function currentUserId(): string | undefined {
  */
 export async function createBooking(request: BookingRequest): Promise<BookingOutcome> {
   const session = await ensureAnonymousSession();
-  return createBookingTransaction(getFirebaseServices().db, session.uid, request);
+  // No answer in time → UNCONFIRMED (never "failed", never "booked"); a retry
+  // reuses the same bookingId, so a commit that did land is found, not doubled.
+  return withTimeout(
+    createBookingTransaction(getFirebaseServices().db, session.uid, request),
+    SERVER_TIMEOUT_MS,
+    (): BookingOutcome => ({ kind: 'error', code: 'UNCONFIRMED' }),
+  );
 }
 
 /** One of the signed-in user's bookings (owner-only by the rules). */
@@ -140,5 +150,9 @@ export function subscribeToMyBookings(
 /** Cancels one of the signed-in user's bookings and releases its lock atomically. */
 export async function cancelBooking(bookingId: string): Promise<CancelOutcome> {
   const session = await ensureAnonymousSession();
-  return cancelBookingTransaction(getFirebaseServices().db, session.uid, bookingId);
+  return withTimeout(
+    cancelBookingTransaction(getFirebaseServices().db, session.uid, bookingId),
+    SERVER_TIMEOUT_MS,
+    (): CancelOutcome => ({ kind: 'error', code: 'UNCONFIRMED' }),
+  );
 }

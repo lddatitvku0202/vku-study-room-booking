@@ -1212,6 +1212,44 @@ Known issues: the demo runs as a script, not as an in-app screen (PLAN TASK 33's
 the in-app two-user race was verified through the real UI in 31R.
 Next task: 36R
 
+## 36R — Offline policy: no booking queue, booking lockout
+
+Status: DONE
+Implemented:
+- **Lockout:** in firebase mode "Đặt phòng" is enabled only when the slot availability is
+  server-confirmed (`fromServer`), never on a cached snapshot. Caption: "Checking
+  availability with the server…" before the first confirmation; "Offline — booking needs a
+  connection to the server. Nothing is queued." once a confirmed listener falls back to
+  cache. Browsing keeps working from the cached room list.
+- **No queue:** bookings and cancellations are written only through `runTransaction()`,
+  which Firestore never places in its offline write queue; the app has no `setDoc` /
+  `writeBatch` path for bookings and no retry queue of its own.
+- **Timeouts:** `createBooking` / `cancelBooking` resolve `UNCONFIRMED` after 15 s without a
+  server answer (`utils/with-timeout.ts`) — the user is told to check My Bookings, never told
+  "booked" or "failed"; a retry of the same slot reuses the booking id (I6), so a commit that
+  did land is returned instead of doubled.
+- `useRoomAvailability` reports `wasLive` (this listener has been server-confirmed before) so
+  the UI can tell "still connecting" from "went offline".
+Finding (recorded in the test): Firestore's `disableNetwork()` pauses listeners and the
+queued-write pipeline but **not transactions** — a transaction still committed. The offline
+test therefore uses `disableNetwork()` only for the availability signal and a client pointed
+at an unreachable server for the booking attempt.
+Verification:
+  typecheck / lint / format → PASS; npm test → 129/129 (+3 timeout tests)
+  npm run test:rules → 84/84 (+2): availability turns not-server-confirmed offline and
+    confirmed again after reconnecting; with the server unreachable a booking attempt returns
+    an error (never success) and nothing is written
+  **Production, real browser offline mode** (Chrome DevTools network emulation): online →
+    availability confirmed in 157 ms, booking enabled; offline → the offline message appears
+    and "Đặt phòng" is disabled, the room stays browsable; back online → booking enabled again
+    in 500 ms
+  Mock-mode browser regression → PASS (one earlier run failed only because the random demo
+    simulator produced no conflict within the test's attempts; the test now tries 12 rooms)
+Commit: `feat(booking): enforce offline booking lockout`
+Known issues: an `UNCONFIRMED` booking that later committed is visible in My Bookings (the
+realtime list) — the user is told to check there.
+Next task: RD (production configuration and documentation)
+
 ---
 
 ## Task log template
