@@ -1177,6 +1177,41 @@ expo-notifications (MVP-06), so Android reminders need a development build.
 Commit: `feat(notifications): bind qr and reminders to confirmed bookings`
 Next task: 32R/33R
 
+## 32R/33R — Real-transaction 70/30 contention demo
+
+Status: DONE
+Implemented:
+- `utils/contention-plan.ts` (pure) — `planContention`: ~30% of participants on one hot
+  slot (at least 2), the rest on distinct free slots, delays 1–1.5 s; randomness only shapes
+  traffic (who/when). `summarizeContention`: measured successes / conflicts / errors, hot
+  winners, rates — never forced.
+- `services/firebase/contention-demo.ts` — `runContentionDemo`: each participant (its own
+  Firebase client and anonymous user) waits its delay (Promise + setTimeout) and runs the
+  app's `createBookingTransaction`; `cleanUpContentionDemo` cancels every demo booking by its
+  owner. Not imported by the app, so it is not in the app bundle.
+- `scripts/contention-demo.ts` — `npm run demo:contention:emulator` (seeds rooms, runs on
+  the emulator) and `npm run demo:contention -- --production [--participants N]
+  [--days-ahead D] [--keep]`; prints a per-participant table and the measured split;
+  production target is checked against `.firebaserc`.
+- `docs/demo-script.md` — how to run it, expected output, and why the measured success
+  rate is slightly above 70%.
+Verification:
+  typecheck / lint / format → PASS
+  npm test → 126/126 (+5 plan/summary tests)
+  npm run test:rules → 82/82 (+3): three 30-participant runs on the emulator — each 9 hot
+    attempts → exactly 1 winner, 21/21 independent booked, 8 conflicts, 0 errors; cleanup
+    releases every demo booking
+  `npm run demo:contention:emulator` → 22 success / 8 SLOT_TAKEN / 0 errors, 1 hot winner,
+    measured 73.3% / 26.7%, cleanup 22/22
+  **Production** (`npm run demo:contention -- --production --participants 30`): 30 separate
+    anonymous clients on the real project and real rules → hot slot room-C305 15:00–17:00:
+    9 attempts → exactly 1 winner (participant 10, not the first to start); 21/21 independent
+    booked; 22 / 8 / 0 → measured 73.3% / 26.7%; cleanup 22/22 cancelled by their owners
+Commit: `feat(demo): add real-transaction contention simulation`
+Known issues: the demo runs as a script, not as an in-app screen (PLAN TASK 33's screen);
+the in-app two-user race was verified through the real UI in 31R.
+Next task: 36R
+
 ---
 
 ## Task log template

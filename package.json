@@ -48,7 +48,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:rules": "firebase emulators:exec --only auth,firestore --project demo-vku-study-room-booking \"vitest run --config vitest.emulator.config.mjs\"",
-    "seed:rooms": "tsx scripts/seed-rooms.ts"
+    "seed:rooms": "tsx scripts/seed-rooms.ts",
+    "demo:contention": "tsx scripts/contention-demo.ts",
+    "demo:contention:emulator": "firebase emulators:exec --only auth,firestore --project demo-vku-study-room-booking \"npm run seed:rooms -- --emulator && tsx scripts/contention-demo.ts --emulator\""
   },
   "private": true
 }
