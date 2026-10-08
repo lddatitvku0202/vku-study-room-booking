@@ -12,3 +12,6 @@ assets/
 
 # Expo CLI rewrites tsconfig.json formatting on start — let it own that file
 tsconfig.json
+
+# Firebase CLI project alias file (JSON without an extension; managed by `firebase use`)
+.firebaserc

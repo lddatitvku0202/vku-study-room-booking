@@ -687,6 +687,52 @@ Known issues: the browser dialog cannot show custom button labels, so the confir
 branch is the unchanged `Alert.alert` call).
 Next task: 06R
 
+## 06R — Lazy Firebase foundation behind the data-source switch
+
+Status: DONE
+Implemented:
+- `firebase@^13.0.0` (via `npx expo install`); `vitest@^5.0.3` (dev) with `npm test`.
+- **Data-source switch:** `DATA_SOURCE` → `app.config.ts` `extra.dataSource` →
+  `AppConfig.dataSource` (`mock` default | `firebase`); `services/config.ts` exports
+  `dataSource`, `isFirebaseMode`, `isUsingEmulator`.
+- **Validation** (`utils/parse-config.ts`, pure): Firebase values required only in firebase
+  mode; `.env.example` placeholders rejected against the cloud; the emulator only with a
+  `demo-` project id and never with `APP_ENV=production`; mock mode ignores Firebase values.
+- **Foundation** (`services/firebase/app.ts`): `getFirebaseServices()` creates app / Auth /
+  Firestore on first call only, reuses an existing app on fast refresh, memory-only
+  Firestore cache, long-polling auto-detect for React Native, emulator wiring from config.
+- **Platform persistence (AD-40):** `auth-persistence.native.ts` (AsyncStorage via
+  `getReactNativePersistence`) and `auth-persistence.ts` (web, `browserLocalPersistence`);
+  `auth-react-native.d.ts` declares the RN-only function for TypeScript (rebuilt from the
+  stash's idea, not applied from it).
+- **Gateway** (`services/firebase-backend.ts`): imports no Firebase code; `loadFirebaseBackend()`
+  dynamically imports `services/firebase/index.ts` in firebase mode and refuses in mock mode.
+  `index.ts` and `App.tsx` gained **no** Firebase import.
+- **Firebase project wiring:** `.firebaserc` (default `vku-study-room-booking`),
+  `firebase.json` (Firestore rules/indexes, emulators auth :9099, firestore :8080, single
+  project mode, UI off), placeholder deny-all `firestore.rules` (replaced in 09R; **not
+  deployed**), empty `firestore.indexes.json`. A Firebase **Web app** was registered in the
+  project (`firebase apps:create WEB`) and its public config written to the local,
+  gitignored `.env` (values never printed; `USE_FIREBASE_EMULATOR` set to `false` there).
+Verification:
+  npm run typecheck / lint / format:check → PASS
+  npm test → 13/13 (config parsing: mock default, placeholders, missing keys, emulator
+    safety, production guard, malformed values)
+  npx expo export web / android / ios → PASS (exit 0)
+  Browser (headless Edge, exported web builds):
+    mock build → renders "120 of 120 rooms", no page errors, external hosts contacted:
+      only picsum.photos (no Firebase / Google endpoints); main bundle contains no
+      Firestore/Identity Toolkit endpoints
+    firebase-mode build with the real config → boots, no errors (nothing calls Firebase yet)
+    emulator + real project id → refuses to start with the explicit ConfigError
+Found during verification: Expo's bundler cache kept serving the previously embedded
+manifest (the old `useFirebaseEmulator: true`) after `.env` changed — three exports were
+byte-identical. Exports with `--clear` embed the current values. After changing `.env` or
+`DATA_SOURCE`, always build with `--clear` (already in the README).
+Commit: `feat(firebase): add lazy firebase foundation behind data-source flag`
+Known issues: none blocking. Anonymous sign-in is 08R; rules are a deny-all placeholder.
+Next task: 08R
+
 ---
 
 ## Task log template

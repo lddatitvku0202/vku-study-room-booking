@@ -21,6 +21,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     ...config.extra,
     appEnv: process.env.APP_ENV,
+    dataSource: process.env.DATA_SOURCE,
     useFirebaseEmulator: process.env.USE_FIREBASE_EMULATOR,
     emulatorHost: process.env.EMULATOR_HOST,
     firebase: {

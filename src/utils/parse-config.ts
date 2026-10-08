@@ -5,9 +5,18 @@
  * returns a validated value or throws. That keeps it unit-testable with no mocks
  * and lets a configuration failure be reported once, loudly, at startup rather
  * than surfacing later as an `undefined` deep inside a Firestore call.
+ *
+ * Rules (AD-37, AD-42):
+ * - `DATA_SOURCE` is `mock` (default) or `firebase`.
+ * - In firebase mode the six Firebase web-config values are required and must not
+ *   be the `.env.example` placeholders (except against the emulator).
+ * - The emulator may only be used with a `demo-` project id, and never in a
+ *   production build — so a test run can never touch the real project, and a
+ *   release can never point at a developer's machine.
+ * - In mock mode Firebase values are optional and ignored.
  */
 
-import type { AppConfig, AppEnvironment, FirebaseConfig } from '@/types/config';
+import type { AppConfig, AppEnvironment, DataSource, FirebaseConfig } from '@/types/config';
 
 /** Thrown when configuration is missing or malformed. */
 export class ConfigError extends Error {
@@ -28,6 +37,12 @@ export class ConfigError extends Error {
 }
 
 const APP_ENVIRONMENTS = ['development', 'production'] as const satisfies readonly AppEnvironment[];
+const DATA_SOURCES = ['mock', 'firebase'] as const satisfies readonly DataSource[];
+
+/** Marker used by the `.env.example` placeholder values. */
+const PLACEHOLDER_MARKER = 'placeholder';
+/** Emulator-only Firebase project ids start with this (Firebase convention). */
+export const DEMO_PROJECT_PREFIX = 'demo-';
 
 const FIREBASE_KEYS = [
   'apiKey',
@@ -64,14 +79,15 @@ function isAppEnvironment(value: string): value is AppEnvironment {
   return (APP_ENVIRONMENTS as readonly string[]).includes(value);
 }
 
-/**
- * Build a FirebaseConfig, appending a problem per missing key.
- * Returns `undefined` when anything is missing — the caller then throws.
- */
-function readFirebaseConfig(
-  source: Record<string, unknown>,
-  problems: string[],
-): FirebaseConfig | undefined {
+function isDataSource(value: string): value is DataSource {
+  return (DATA_SOURCES as readonly string[]).includes(value);
+}
+
+/** The Firebase config if all six values are present, plus the names of missing ones. */
+function readFirebaseConfig(source: Record<string, unknown>): {
+  readonly config: FirebaseConfig | null;
+  readonly missing: readonly string[];
+} {
   const apiKey = readString(source, 'apiKey');
   const authDomain = readString(source, 'authDomain');
   const projectId = readString(source, 'projectId');
@@ -87,11 +103,9 @@ function readFirebaseConfig(
     messagingSenderId,
     appId,
   };
-  for (const key of FIREBASE_KEYS) {
-    if (found[key] === undefined) {
-      problems.push(`${FIREBASE_ENV_NAMES[key]} is missing or empty`);
-    }
-  }
+  const missing = FIREBASE_KEYS.filter((key) => found[key] === undefined).map(
+    (key) => FIREBASE_ENV_NAMES[key],
+  );
 
   if (
     apiKey === undefined ||
@@ -101,10 +115,12 @@ function readFirebaseConfig(
     messagingSenderId === undefined ||
     appId === undefined
   ) {
-    return undefined;
+    return { config: null, missing };
   }
-
-  return { apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId };
+  return {
+    config: { apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId },
+    missing,
+  };
 }
 
 /**
@@ -134,23 +150,73 @@ export function parseAppConfig(raw: unknown): AppConfig {
     );
   }
 
+  const dataSourceRaw = readString(raw, 'dataSource') ?? 'mock';
+  let dataSource: DataSource = 'mock';
+  if (isDataSource(dataSourceRaw)) {
+    dataSource = dataSourceRaw;
+  } else {
+    problems.push(
+      `DATA_SOURCE must be one of ${DATA_SOURCES.join(' | ')} (received "${dataSourceRaw}")`,
+    );
+  }
+
   const emulatorRaw = readString(raw, 'useFirebaseEmulator') ?? 'false';
   if (emulatorRaw !== 'true' && emulatorRaw !== 'false') {
     problems.push(`USE_FIREBASE_EMULATOR must be "true" or "false" (received "${emulatorRaw}")`);
   }
+  const useFirebaseEmulator = emulatorRaw === 'true';
 
   const emulatorHost = readString(raw, 'emulatorHost') ?? '127.0.0.1';
 
   const firebaseRaw = raw['firebase'];
-  const firebase = readFirebaseConfig(isRecord(firebaseRaw) ? firebaseRaw : {}, problems);
+  const { config: firebase, missing } = readFirebaseConfig(
+    isRecord(firebaseRaw) ? firebaseRaw : {},
+  );
 
-  if (problems.length > 0 || firebase === undefined) {
+  if (dataSource === 'firebase') {
+    for (const name of missing) {
+      problems.push(`${name} is missing or empty (required when DATA_SOURCE=firebase)`);
+    }
+    if (firebase !== null) {
+      const isDemoProject = firebase.projectId.startsWith(DEMO_PROJECT_PREFIX);
+      if (useFirebaseEmulator) {
+        if (!isDemoProject) {
+          problems.push(
+            `USE_FIREBASE_EMULATOR=true requires a "${DEMO_PROJECT_PREFIX}" FIREBASE_PROJECT_ID ` +
+              `(received "${firebase.projectId}"), so emulator runs can never reach a real project`,
+          );
+        }
+        if (appEnv === 'production') {
+          problems.push('USE_FIREBASE_EMULATOR=true is not allowed when APP_ENV=production');
+        }
+      } else {
+        const placeholders = FIREBASE_KEYS.filter((key) =>
+          firebase[key].toLowerCase().includes(PLACEHOLDER_MARKER),
+        );
+        for (const key of placeholders) {
+          problems.push(
+            `${FIREBASE_ENV_NAMES[key]} still holds the .env.example placeholder — set the real ` +
+              'web config (firebase apps:sdkconfig WEB) for DATA_SOURCE=firebase',
+          );
+        }
+        if (isDemoProject) {
+          problems.push(
+            `FIREBASE_PROJECT_ID "${firebase.projectId}" is an emulator-only project; ` +
+              'set USE_FIREBASE_EMULATOR=true or use the real project id',
+          );
+        }
+      }
+    }
+  }
+
+  if (problems.length > 0) {
     throw new ConfigError(problems);
   }
 
   return {
     appEnv,
-    useFirebaseEmulator: emulatorRaw === 'true',
+    dataSource,
+    useFirebaseEmulator,
     emulatorHost,
     firebase,
   };

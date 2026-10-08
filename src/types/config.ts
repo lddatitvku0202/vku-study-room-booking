@@ -10,6 +10,13 @@
 export type AppEnvironment = 'development' | 'production';
 
 /**
+ * Where server data comes from (AD-37).
+ * - `mock`: the Emergency MVP — local rooms, local demo bookings, no Firebase.
+ * - `firebase`: Firestore is the source of truth; Firebase is initialized lazily.
+ */
+export type DataSource = 'mock' | 'firebase';
+
+/**
  * Firebase **web** configuration.
  *
  * Public by design — it ships inside every client build (CLAUDE.md §8).
@@ -27,7 +34,13 @@ export interface FirebaseConfig {
 /** The fully validated configuration the app runs on. */
 export interface AppConfig {
   readonly appEnv: AppEnvironment;
+  readonly dataSource: DataSource;
   readonly useFirebaseEmulator: boolean;
   readonly emulatorHost: string;
-  readonly firebase: FirebaseConfig;
+  /**
+   * The Firebase web config. Always present and validated in firebase mode;
+   * in mock mode it is `null` unless all six values happen to be set (and it
+   * is never used).
+   */
+  readonly firebase: FirebaseConfig | null;
 }
